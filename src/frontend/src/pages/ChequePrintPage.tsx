@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,8 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { FileSpreadsheet, FileText, Layers, Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
@@ -60,6 +60,17 @@ interface PrintRecord {
   templateId: string;
   printedAt: string;
   printedBy: string;
+}
+
+interface BulkRow {
+  leafId: string;
+  leafNumber: number;
+  selected: boolean;
+  payee: string;
+  amount: string;
+  amountWords: string;
+  date: string;
+  memo: string;
 }
 
 const LS_ACCOUNTS = "bizpos_bank_accounts";
@@ -133,6 +144,78 @@ function numToWords(amount: number): string {
   return toWords(intPart) + (decPart > 0 ? ` and ${decPart}/100` : " Only");
 }
 
+function printChequeOnDoc(
+  doc: any,
+  tpl: ChequeTemplate,
+  data: {
+    payeeName: string;
+    amount: number;
+    amountWords: string;
+    date: string;
+    memo: string;
+    leafNumber: number;
+    accountNumber: string;
+  },
+) {
+  const f = tpl.fields;
+  doc.setFillColor(tpl.bgColor);
+  doc.rect(0, 0, tpl.chequeWidth, tpl.chequeHeight, "F");
+  doc.setTextColor("#000000");
+
+  if (f.bankName) {
+    doc.setFontSize(f.bankName.fontSize || 9);
+    doc.text(
+      data.leafNumber ? `Cheque #${data.leafNumber}` : "",
+      f.bankName.x,
+      f.bankName.y,
+    );
+  }
+  if (f.date) {
+    doc.setFontSize(f.date.fontSize || 10);
+    doc.text(data.date, f.date.x, f.date.y);
+  }
+  if (f.payeeName) {
+    doc.setFontSize(f.payeeName.fontSize || 11);
+    doc.text(data.payeeName, f.payeeName.x, f.payeeName.y, {
+      maxWidth: f.payeeName.w,
+    });
+  }
+  if (f.amountWords) {
+    doc.setFontSize(f.amountWords.fontSize || 10);
+    doc.text(data.amountWords, f.amountWords.x, f.amountWords.y, {
+      maxWidth: f.amountWords.w,
+    });
+  }
+  if (f.amountNumbers) {
+    doc.setFontSize(f.amountNumbers.fontSize || 12);
+    doc.text(
+      data.amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      f.amountNumbers.x,
+      f.amountNumbers.y,
+    );
+  }
+  if (f.accountNumber && data.accountNumber) {
+    doc.setFontSize(f.accountNumber.fontSize || 9);
+    doc.text(data.accountNumber, f.accountNumber.x, f.accountNumber.y);
+  }
+  if (f.memo && data.memo) {
+    doc.setFontSize(f.memo.fontSize || 9);
+    doc.text(data.memo, f.memo.x, f.memo.y, { maxWidth: f.memo.w });
+  }
+  if (f.signatureLine) {
+    doc.setDrawColor("#000000");
+    doc.line(
+      f.signatureLine.x,
+      f.signatureLine.y,
+      f.signatureLine.x + (f.signatureLine.w || 55),
+      f.signatureLine.y,
+    );
+  }
+}
+
 export default function ChequePrintPage() {
   const { currentUser } = useAuth();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -141,6 +224,7 @@ export default function ChequePrintPage() {
   const [templates, setTemplates] = useState<ChequeTemplate[]>([]);
   const [history, setHistory] = useState<PrintRecord[]>([]);
 
+  // Single print state
   const [selAccount, setSelAccount] = useState("");
   const [selBook, setSelBook] = useState("");
   const [selLeaf, setSelLeaf] = useState("");
@@ -152,10 +236,19 @@ export default function ChequePrintPage() {
     new Date().toISOString().slice(0, 10),
   );
   const [memo, setMemo] = useState("");
+
+  // History filter state
   const [histSearch, setHistSearch] = useState("");
   const [histAccount, setHistAccount] = useState("all");
   const [histDateFrom, setHistDateFrom] = useState("");
   const [histDateTo, setHistDateTo] = useState("");
+
+  // Bulk print state
+  const [bulkAccount, setBulkAccount] = useState("");
+  const [bulkBook, setBulkBook] = useState("");
+  const [bulkTemplate, setBulkTemplate] = useState("");
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   useEffect(() => {
     setAccounts(load<BankAccount>(LS_ACCOUNTS));
@@ -171,7 +264,6 @@ export default function ChequePrintPage() {
   const filteredLeaves = leaves.filter(
     (l) => l.chequebookId === selBook && l.status === "available",
   );
-  const _selectedAccount = accounts.find((a) => a.id === selAccount);
   const selectedTemplate = templates.find((t) => t.id === selTemplate);
 
   function handleAmountChange(val: string) {
@@ -181,7 +273,11 @@ export default function ChequePrintPage() {
     else setAmountWords("");
   }
 
-  function generatePDF(record?: PrintRecord) {
+  function getJsPDF() {
+    return (window as any).jspdf?.jsPDF || (window as any).jsPDF;
+  }
+
+  function generateSinglePDF(record?: PrintRecord) {
     const tpl = record
       ? templates.find((t) => t.id === record.templateId)
       : selectedTemplate;
@@ -201,79 +297,22 @@ export default function ChequePrintPage() {
       (a) => a.id === (record?.bankAccountId || selAccount),
     );
 
-    const JsPDF = (window as any).jspdf?.jsPDF || (window as any).jsPDF;
+    const JsPDF = getJsPDF();
     const doc = new JsPDF({
       unit: "mm",
       format: [tpl.chequeWidth, tpl.chequeHeight],
       orientation: "landscape",
     });
-    // Background
-    doc.setFillColor(tpl.bgColor);
-    doc.rect(0, 0, tpl.chequeWidth, tpl.chequeHeight, "F");
 
-    const f = tpl.fields;
-    doc.setTextColor("#000000");
-
-    // Bank Name
-    if (f.bankName) {
-      doc.setFontSize(f.bankName.fontSize || 9);
-      doc.text(
-        String(rec.leafNumber ? `Cheque #${rec.leafNumber}` : ""),
-        f.bankName.x,
-        f.bankName.y,
-      );
-    }
-    // Date
-    if (f.date) {
-      doc.setFontSize(f.date.fontSize || 10);
-      doc.text(rec.date, f.date.x, f.date.y);
-    }
-    // Payee
-    if (f.payeeName) {
-      doc.setFontSize(f.payeeName.fontSize || 11);
-      doc.text(rec.payeeName, f.payeeName.x, f.payeeName.y, {
-        maxWidth: f.payeeName.w,
-      });
-    }
-    // Amount Words
-    if (f.amountWords) {
-      doc.setFontSize(f.amountWords.fontSize || 10);
-      doc.text(rec.amountWords, f.amountWords.x, f.amountWords.y, {
-        maxWidth: f.amountWords.w,
-      });
-    }
-    // Amount Numbers
-    if (f.amountNumbers) {
-      doc.setFontSize(f.amountNumbers.fontSize || 12);
-      doc.text(
-        rec.amount.toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        f.amountNumbers.x,
-        f.amountNumbers.y,
-      );
-    }
-    // Account Number
-    if (f.accountNumber && account) {
-      doc.setFontSize(f.accountNumber.fontSize || 9);
-      doc.text(account.accountNumber, f.accountNumber.x, f.accountNumber.y);
-    }
-    // Memo
-    if (f.memo && rec.memo) {
-      doc.setFontSize(f.memo.fontSize || 9);
-      doc.text(rec.memo, f.memo.x, f.memo.y, { maxWidth: f.memo.w });
-    }
-    // Signature Line
-    if (f.signatureLine) {
-      doc.setDrawColor("#000000");
-      doc.line(
-        f.signatureLine.x,
-        f.signatureLine.y,
-        f.signatureLine.x + (f.signatureLine.w || 55),
-        f.signatureLine.y,
-      );
-    }
+    printChequeOnDoc(doc, tpl, {
+      payeeName: rec.payeeName,
+      amount: rec.amount,
+      amountWords: rec.amountWords,
+      date: rec.date,
+      memo: rec.memo,
+      leafNumber: (rec as any).leafNumber || 0,
+      accountNumber: account?.accountNumber || "",
+    });
 
     doc.save(`cheque_${(rec as any).leafNumber || "print"}.pdf`);
   }
@@ -292,8 +331,7 @@ export default function ChequePrintPage() {
     }
     const leaf = leaves.find((l) => l.id === selLeaf);
     if (!leaf) return;
-    generatePDF();
-    // Mark leaf used
+    generateSinglePDF();
     const updatedLeaves = leaves.map((l) =>
       l.id === selLeaf
         ? {
@@ -305,7 +343,6 @@ export default function ChequePrintPage() {
     );
     save(LS_LEAVES, updatedLeaves);
     setLeaves(updatedLeaves);
-    // Record history
     const rec: PrintRecord = {
       id: `ph${Date.now()}`,
       chequebookId: selBook,
@@ -324,24 +361,158 @@ export default function ChequePrintPage() {
     const updatedHistory = [rec, ...history];
     save(LS_HISTORY, updatedHistory);
     setHistory(updatedHistory);
-    // Reset leaf selection
     setSelLeaf("");
-    // Update book status if exhausted
-    const book = books.find((b) => b.id === selBook);
-    if (book) {
-      const remaining = updatedLeaves.filter(
-        (l) => l.chequebookId === selBook && l.status === "available",
-      ).length;
-      if (remaining === 0) {
-        const updatedBooks = books.map((b) =>
-          b.id === selBook ? { ...b, status: "exhausted" } : b,
-        );
-        save(LS_BOOKS, updatedBooks);
-        setBooks(updatedBooks);
-      }
+    const remaining = updatedLeaves.filter(
+      (l) => l.chequebookId === selBook && l.status === "available",
+    ).length;
+    if (remaining === 0) {
+      const updatedBooks = books.map((b) =>
+        b.id === selBook ? { ...b, status: "exhausted" } : b,
+      );
+      save(LS_BOOKS, updatedBooks);
+      setBooks(updatedBooks);
     }
   }
 
+  // ---- Bulk print helpers ----
+  const bulkFilteredBooks = books.filter(
+    (b) => b.bankAccountId === bulkAccount && b.status === "active",
+  );
+  const bulkAvailableLeaves = leaves.filter(
+    (l) => l.chequebookId === bulkBook && l.status === "available",
+  );
+
+  function buildBulkRows(bookId: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    const available = leaves.filter(
+      (l) => l.chequebookId === bookId && l.status === "available",
+    );
+    setBulkRows(
+      available.map((l) => ({
+        leafId: l.id,
+        leafNumber: l.leafNumber,
+        selected: false,
+        payee: "",
+        amount: "",
+        amountWords: "",
+        date: today,
+        memo: "",
+      })),
+    );
+  }
+
+  function updateBulkRow(idx: number, patch: Partial<BulkRow>) {
+    setBulkRows((rows) =>
+      rows.map((r, i) => {
+        if (i !== idx) return r;
+        const updated = { ...r, ...patch };
+        // Auto-compute amountWords if amount changed
+        if (patch.amount !== undefined) {
+          const n = Number.parseFloat(patch.amount);
+          updated.amountWords = !Number.isNaN(n) ? numToWords(n) : "";
+        }
+        return updated;
+      }),
+    );
+  }
+
+  const allSelected = bulkRows.length > 0 && bulkRows.every((r) => r.selected);
+  const selectedCount = bulkRows.filter((r) => r.selected).length;
+
+  function toggleSelectAll(checked: boolean) {
+    setBulkRows((rows) => rows.map((r) => ({ ...r, selected: checked })));
+  }
+
+  async function generateBulkPDF() {
+    const selected = bulkRows.filter((r) => r.selected);
+    if (selected.length === 0) {
+      alert("Please select at least one cheque.");
+      return;
+    }
+    if (!bulkTemplate) {
+      alert("Please select a cheque template.");
+      return;
+    }
+    const tpl = templates.find((t) => t.id === bulkTemplate);
+    if (!tpl) {
+      alert("Template not found.");
+      return;
+    }
+    const account = accounts.find((a) => a.id === bulkAccount);
+
+    setBulkGenerating(true);
+    try {
+      const JsPDF = getJsPDF();
+      const doc = new JsPDF({
+        unit: "mm",
+        format: [tpl.chequeWidth, tpl.chequeHeight],
+        orientation: "landscape",
+      });
+
+      const now = new Date();
+      const newHistory: PrintRecord[] = [];
+      let updatedLeaves = [...leaves];
+
+      selected.forEach((row, idx) => {
+        if (idx > 0) {
+          doc.addPage([tpl.chequeWidth, tpl.chequeHeight], "landscape");
+        }
+        printChequeOnDoc(doc, tpl, {
+          payeeName: row.payee,
+          amount: Number.parseFloat(row.amount) || 0,
+          amountWords: row.amountWords,
+          date: row.date,
+          memo: row.memo,
+          leafNumber: row.leafNumber,
+          accountNumber: account?.accountNumber || "",
+        });
+
+        // Mark leaf as used
+        updatedLeaves = updatedLeaves.map((l) =>
+          l.id === row.leafId
+            ? {
+                ...l,
+                status: "used",
+                dateUsed: now.toISOString().slice(0, 10),
+              }
+            : l,
+        );
+
+        newHistory.push({
+          id: `ph${Date.now()}_${idx}`,
+          chequebookId: bulkBook,
+          leafId: row.leafId,
+          leafNumber: row.leafNumber,
+          bankAccountId: bulkAccount,
+          payeeName: row.payee,
+          amount: Number.parseFloat(row.amount) || 0,
+          amountWords: row.amountWords,
+          date: row.date,
+          memo: row.memo,
+          templateId: bulkTemplate,
+          printedAt: now.toISOString(),
+          printedBy: currentUser?.name || "",
+        });
+      });
+
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+      doc.save(`bulk_cheques_${dateStr}.pdf`);
+
+      // Persist
+      save(LS_LEAVES, updatedLeaves);
+      setLeaves(updatedLeaves);
+      const updatedHistory = [...newHistory, ...history];
+      save(LS_HISTORY, updatedHistory);
+      setHistory(updatedHistory);
+
+      // Refresh bulk rows (remove used ones)
+      buildBulkRows(bulkBook);
+    } finally {
+      setBulkGenerating(false);
+    }
+  }
+
+  // ---- History ----
   const filteredHistory = history.filter(
     (h) =>
       (histAccount === "all" || h.bankAccountId === histAccount) &&
@@ -410,10 +581,18 @@ export default function ChequePrintPage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Cheque Print</h1>
       <Tabs defaultValue="print">
         <TabsList className="mb-4">
-          <TabsTrigger value="print">Print Cheque</TabsTrigger>
+          <TabsTrigger value="print">
+            <Printer className="w-4 h-4 mr-1" />
+            Print Cheque
+          </TabsTrigger>
+          <TabsTrigger value="bulk">
+            <Layers className="w-4 h-4 mr-1" />
+            Bulk Print
+          </TabsTrigger>
           <TabsTrigger value="history">Print History</TabsTrigger>
         </TabsList>
 
+        {/* ===== Single Print ===== */}
         <TabsContent value="print">
           <div className="max-w-2xl bg-white rounded-lg border shadow-sm p-6">
             <div className="grid gap-4">
@@ -432,13 +611,11 @@ export default function ChequePrintPage() {
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accounts
-                        .filter((a) => a.id)
-                        .map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.accountTitle} ({a.accountNumber})
-                          </SelectItem>
-                        ))}
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.accountTitle} ({a.accountNumber})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -563,6 +740,7 @@ export default function ChequePrintPage() {
                   className="w-full bg-blue-600 hover:bg-blue-700"
                   size="lg"
                   onClick={printCheque}
+                  data-ocid="cheque_print.primary_button"
                 >
                   <Printer className="w-5 h-5 mr-2" />
                   Generate & Download Cheque PDF
@@ -576,6 +754,231 @@ export default function ChequePrintPage() {
           </div>
         </TabsContent>
 
+        {/* ===== Bulk Print ===== */}
+        <TabsContent value="bulk">
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <h2 className="font-semibold text-gray-700 mb-4">
+              Bulk Cheque Print
+            </h2>
+
+            {/* Selection row */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <Label>Bank Account *</Label>
+                <Select
+                  value={bulkAccount}
+                  onValueChange={(v) => {
+                    setBulkAccount(v);
+                    setBulkBook("");
+                    setBulkRows([]);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.accountTitle} ({a.accountNumber})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Cheque Book *</Label>
+                <Select
+                  value={bulkBook}
+                  onValueChange={(v) => {
+                    setBulkBook(v);
+                    buildBulkRows(v);
+                  }}
+                  disabled={!bulkAccount}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select cheque book" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bulkFilteredBooks.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.chequebookNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Cheque Template *</Label>
+                <Select value={bulkTemplate} onValueChange={setBulkTemplate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Info bar */}
+            {bulkRows.length > 0 && (
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-sm px-3 py-1">
+                    {bulkAvailableLeaves.length} available leaves
+                  </Badge>
+                  <Badge className="text-sm px-3 py-1 bg-blue-600">
+                    {selectedCount} selected
+                  </Badge>
+                </div>
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={generateBulkPDF}
+                  disabled={bulkGenerating || selectedCount === 0}
+                  data-ocid="cheque_print.primary_button"
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  {bulkGenerating
+                    ? "Generating..."
+                    : `Generate Bulk PDF (${selectedCount} cheque${
+                        selectedCount !== 1 ? "s" : ""
+                      })`}
+                </Button>
+              </div>
+            )}
+
+            {/* Bulk rows table */}
+            {bulkRows.length === 0 && bulkBook && (
+              <div className="text-center py-12 text-gray-400">
+                No available cheque leaves in this book.
+              </div>
+            )}
+            {bulkRows.length === 0 && !bulkBook && (
+              <div className="text-center py-12 text-gray-400">
+                Select an account and cheque book to load available leaves.
+              </div>
+            )}
+
+            {bulkRows.length > 0 && (
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-3 py-3 w-10">
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={(c) => toggleSelectAll(c === true)}
+                          data-ocid="cheque_print.checkbox"
+                        />
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Leaf #
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Payee Name *
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Amount *
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Amount in Words
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Date *
+                      </th>
+                      <th className="text-left px-3 py-3 font-medium text-gray-600">
+                        Memo
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkRows.map((row, idx) => (
+                      <tr
+                        key={row.leafId}
+                        className={`border-b ${
+                          row.selected ? "bg-blue-50" : "hover:bg-gray-50"
+                        }`}
+                        data-ocid={`cheque_print.item.${idx + 1}`}
+                      >
+                        <td className="px-3 py-2">
+                          <Checkbox
+                            checked={row.selected}
+                            onCheckedChange={(c) =>
+                              updateBulkRow(idx, { selected: c === true })
+                            }
+                            data-ocid={`cheque_print.checkbox.${idx + 1}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-gray-600">
+                          #{row.leafNumber}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.payee}
+                            onChange={(e) =>
+                              updateBulkRow(idx, { payee: e.target.value })
+                            }
+                            placeholder="Payee name"
+                            className="h-8 min-w-[150px]"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            value={row.amount}
+                            onChange={(e) =>
+                              updateBulkRow(idx, { amount: e.target.value })
+                            }
+                            placeholder="0.00"
+                            className="h-8 w-28"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.amountWords}
+                            onChange={(e) =>
+                              updateBulkRow(idx, {
+                                amountWords: e.target.value,
+                              })
+                            }
+                            placeholder="Auto-filled"
+                            className="h-8 min-w-[180px]"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="date"
+                            value={row.date}
+                            onChange={(e) =>
+                              updateBulkRow(idx, { date: e.target.value })
+                            }
+                            className="h-8 w-36"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={row.memo}
+                            onChange={(e) =>
+                              updateBulkRow(idx, { memo: e.target.value })
+                            }
+                            placeholder="Optional"
+                            className="h-8 min-w-[120px]"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ===== History ===== */}
         <TabsContent value="history">
           <div className="bg-white rounded-lg border shadow-sm">
             <div className="p-4 flex gap-3 border-b flex-wrap justify-between">
@@ -653,13 +1056,18 @@ export default function ChequePrintPage() {
                       <td
                         colSpan={9}
                         className="text-center py-8 text-gray-400"
+                        data-ocid="cheque_history.empty_state"
                       >
                         No print history
                       </td>
                     </tr>
                   )}
-                  {filteredHistory.map((h) => (
-                    <tr key={h.id} className="border-b hover:bg-gray-50">
+                  {filteredHistory.map((h, idx) => (
+                    <tr
+                      key={h.id}
+                      className="border-b hover:bg-gray-50"
+                      data-ocid={`cheque_history.item.${idx + 1}`}
+                    >
                       <td className="px-4 py-3 font-mono">#{h.leafNumber}</td>
                       <td className="px-4 py-3">
                         {accounts.find((a) => a.id === h.bankAccountId)
@@ -678,7 +1086,7 @@ export default function ChequePrintPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => generatePDF(h)}
+                            onClick={() => generateSinglePDF(h)}
                             title="Re-print"
                           >
                             <Printer className="w-4 h-4" />
