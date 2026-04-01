@@ -11,8 +11,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileSpreadsheet, FileText, Layers, Printer } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Layers,
+  Printer,
+  Upload,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
@@ -34,17 +43,29 @@ interface ChequeLeaf {
   leafNumber: number;
   status: string;
 }
+interface TemplateField {
+  fieldName: string;
+  prefix: string;
+  postfix: string;
+  fieldSize: number;
+  fieldWidth: number;
+  xAxis: number;
+  yAxis: number;
+}
 interface ChequeTemplate {
   id: string;
   name: string;
   bankId: string;
-  chequeWidth: number;
-  chequeHeight: number;
-  bgColor: string;
-  fields: Record<
-    string,
-    { x: number; y: number; w?: number; fontSize?: number }
-  >;
+  // new format
+  chequeHeightInches?: number;
+  chequeWidthInches?: number;
+  fields:
+    | TemplateField[]
+    | Record<string, { x: number; y: number; w?: number; fontSize?: number }>;
+  // old format (kept for migration)
+  chequeWidth?: number;
+  chequeHeight?: number;
+  bgColor?: string;
 }
 interface PrintRecord {
   id: string;
@@ -71,6 +92,15 @@ interface BulkRow {
   amountWords: string;
   date: string;
   memo: string;
+}
+
+interface ImportChequeRow {
+  Payee?: string;
+  Amount?: string | number;
+  "Date (YYYY-MM-DD)"?: string;
+  Memo?: string;
+  _valid?: boolean;
+  _error?: string;
 }
 
 const LS_ACCOUNTS = "bizpos_bank_accounts";
@@ -144,6 +174,17 @@ function numToWords(amount: number): string {
   return toWords(intPart) + (decPart > 0 ? ` and ${decPart}/100` : " Only");
 }
 
+// Helper: get cheque dimensions in mm
+function getChequeDimsMm(tpl: ChequeTemplate): { w: number; h: number } {
+  if (tpl.chequeWidthInches && tpl.chequeHeightInches) {
+    return {
+      w: tpl.chequeWidthInches * 25.4,
+      h: tpl.chequeHeightInches * 25.4,
+    };
+  }
+  return { w: tpl.chequeWidth || 176, h: tpl.chequeHeight || 83 };
+}
+
 function printChequeOnDoc(
   doc: any,
   tpl: ChequeTemplate,
@@ -157,62 +198,90 @@ function printChequeOnDoc(
     accountNumber: string;
   },
 ) {
-  const f = tpl.fields;
-  doc.setFillColor(tpl.bgColor);
-  doc.rect(0, 0, tpl.chequeWidth, tpl.chequeHeight, "F");
+  const dims = getChequeDimsMm(tpl);
+  doc.setFillColor(tpl.bgColor || "#ffffff");
+  doc.rect(0, 0, dims.w, dims.h, "F");
   doc.setTextColor("#000000");
 
-  if (f.bankName) {
-    doc.setFontSize(f.bankName.fontSize || 9);
-    doc.text(
-      data.leafNumber ? `Cheque #${data.leafNumber}` : "",
-      f.bankName.x,
-      f.bankName.y,
-    );
-  }
-  if (f.date) {
-    doc.setFontSize(f.date.fontSize || 10);
-    doc.text(data.date, f.date.x, f.date.y);
-  }
-  if (f.payeeName) {
-    doc.setFontSize(f.payeeName.fontSize || 11);
-    doc.text(data.payeeName, f.payeeName.x, f.payeeName.y, {
-      maxWidth: f.payeeName.w,
-    });
-  }
-  if (f.amountWords) {
-    doc.setFontSize(f.amountWords.fontSize || 10);
-    doc.text(data.amountWords, f.amountWords.x, f.amountWords.y, {
-      maxWidth: f.amountWords.w,
-    });
-  }
-  if (f.amountNumbers) {
-    doc.setFontSize(f.amountNumbers.fontSize || 12);
-    doc.text(
-      data.amount.toLocaleString("en-US", {
+  if (Array.isArray(tpl.fields)) {
+    // New format: TemplateField[]
+    const fieldValueMap: Record<string, string> = {
+      Amount: data.amount.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
-      f.amountNumbers.x,
-      f.amountNumbers.y,
-    );
-  }
-  if (f.accountNumber && data.accountNumber) {
-    doc.setFontSize(f.accountNumber.fontSize || 9);
-    doc.text(data.accountNumber, f.accountNumber.x, f.accountNumber.y);
-  }
-  if (f.memo && data.memo) {
-    doc.setFontSize(f.memo.fontSize || 9);
-    doc.text(data.memo, f.memo.x, f.memo.y, { maxWidth: f.memo.w });
-  }
-  if (f.signatureLine) {
-    doc.setDrawColor("#000000");
-    doc.line(
-      f.signatureLine.x,
-      f.signatureLine.y,
-      f.signatureLine.x + (f.signatureLine.w || 55),
-      f.signatureLine.y,
-    );
+      Date: data.date,
+      Payee: data.payeeName,
+      Rupees: data.amountWords,
+      Bearer: data.payeeName,
+    };
+    for (const fld of tpl.fields as TemplateField[]) {
+      const rawVal = fieldValueMap[fld.fieldName] ?? "";
+      const displayVal = (fld.prefix || "") + rawVal + (fld.postfix || "");
+      if (!displayVal.trim()) continue;
+      doc.setFontSize(fld.fieldSize || 10);
+      doc.text(displayVal, fld.xAxis, fld.yAxis, {
+        maxWidth: fld.fieldWidth || undefined,
+      });
+    }
+  } else {
+    // Old format: Record<string, FieldConfig>
+    const f = tpl.fields as Record<
+      string,
+      { x: number; y: number; w?: number; fontSize?: number }
+    >;
+    if (f.bankName) {
+      doc.setFontSize(f.bankName.fontSize || 9);
+      doc.text(
+        data.leafNumber ? `Cheque #${data.leafNumber}` : "",
+        f.bankName.x,
+        f.bankName.y,
+      );
+    }
+    if (f.date) {
+      doc.setFontSize(f.date.fontSize || 10);
+      doc.text(data.date, f.date.x, f.date.y);
+    }
+    if (f.payeeName) {
+      doc.setFontSize(f.payeeName.fontSize || 11);
+      doc.text(data.payeeName, f.payeeName.x, f.payeeName.y, {
+        maxWidth: f.payeeName.w,
+      });
+    }
+    if (f.amountWords) {
+      doc.setFontSize(f.amountWords.fontSize || 10);
+      doc.text(data.amountWords, f.amountWords.x, f.amountWords.y, {
+        maxWidth: f.amountWords.w,
+      });
+    }
+    if (f.amountNumbers) {
+      doc.setFontSize(f.amountNumbers.fontSize || 12);
+      doc.text(
+        data.amount.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        f.amountNumbers.x,
+        f.amountNumbers.y,
+      );
+    }
+    if (f.accountNumber && data.accountNumber) {
+      doc.setFontSize(f.accountNumber.fontSize || 9);
+      doc.text(data.accountNumber, f.accountNumber.x, f.accountNumber.y);
+    }
+    if (f.memo && data.memo) {
+      doc.setFontSize(f.memo.fontSize || 9);
+      doc.text(data.memo, f.memo.x, f.memo.y, { maxWidth: f.memo.w });
+    }
+    if (f.signatureLine) {
+      doc.setDrawColor("#000000");
+      doc.line(
+        f.signatureLine.x,
+        f.signatureLine.y,
+        f.signatureLine.x + (f.signatureLine.w || 55),
+        f.signatureLine.y,
+      );
+    }
   }
 }
 
@@ -249,6 +318,12 @@ export default function ChequePrintPage() {
   const [bulkTemplate, setBulkTemplate] = useState("");
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkSubTab, setBulkSubTab] = useState<"manual" | "import">("manual");
+  const [importChequeRows, setImportChequeRows] = useState<ImportChequeRow[]>(
+    [],
+  );
+  const [importChequeDone, setImportChequeDone] = useState<number | null>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setAccounts(load<BankAccount>(LS_ACCOUNTS));
@@ -300,7 +375,7 @@ export default function ChequePrintPage() {
     const JsPDF = getJsPDF();
     const doc = new JsPDF({
       unit: "mm",
-      format: [tpl.chequeWidth, tpl.chequeHeight],
+      format: [getChequeDimsMm(tpl).w, getChequeDimsMm(tpl).h],
       orientation: "landscape",
     });
 
@@ -423,6 +498,86 @@ export default function ChequePrintPage() {
     setBulkRows((rows) => rows.map((r) => ({ ...r, selected: checked })));
   }
 
+  // ---- Cheque data import from Excel ----
+  function downloadChequeTemplate() {
+    const XLSX = (window as any).XLSX;
+    const headers = ["Payee", "Amount", "Date (YYYY-MM-DD)", "Memo"];
+    const sample = [
+      "John Doe",
+      15000,
+      new Date().toISOString().slice(0, 10),
+      "Office Supplies",
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cheques");
+    XLSX.writeFile(wb, "cheque_data_import_template.xlsx");
+  }
+
+  function handleChequeFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportChequeDone(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const XLSX = (window as any).XLSX;
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: ImportChequeRow[] = XLSX.utils.sheet_to_json(ws, {
+        defval: "",
+      });
+      const validated = rows.map((r) => {
+        const hasPayee = !!(r.Payee && String(r.Payee).trim());
+        const hasAmount = !!(
+          r.Amount !== "" &&
+          r.Amount !== undefined &&
+          !Number.isNaN(Number(r.Amount))
+        );
+        const valid = hasPayee && hasAmount;
+        return {
+          ...r,
+          _valid: valid,
+          _error: !hasPayee
+            ? "Payee required"
+            : !hasAmount
+              ? "Amount required"
+              : "",
+        };
+      });
+      setImportChequeRows(validated);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
+  function applyImportedRows() {
+    const valid = importChequeRows.filter((r) => r._valid);
+    if (valid.length === 0 || !bulkBook) return;
+    const available = leaves.filter(
+      (l) => l.chequebookId === bulkBook && l.status === "available",
+    );
+    const newRows: BulkRow[] = valid.slice(0, available.length).map((r, i) => {
+      const amt = String(r.Amount ?? "");
+      const n = Number.parseFloat(amt);
+      return {
+        leafId: available[i].id,
+        leafNumber: available[i].leafNumber,
+        selected: true,
+        payee: String(r.Payee ?? ""),
+        amount: amt,
+        amountWords: !Number.isNaN(n) ? numToWords(n) : "",
+        date: String(
+          r["Date (YYYY-MM-DD)"] ?? new Date().toISOString().slice(0, 10),
+        ),
+        memo: String(r.Memo ?? ""),
+      };
+    });
+    setBulkRows(newRows);
+    setImportChequeDone(newRows.length);
+    setBulkSubTab("manual");
+  }
+
   async function generateBulkPDF() {
     const selected = bulkRows.filter((r) => r.selected);
     if (selected.length === 0) {
@@ -445,7 +600,7 @@ export default function ChequePrintPage() {
       const JsPDF = getJsPDF();
       const doc = new JsPDF({
         unit: "mm",
-        format: [tpl.chequeWidth, tpl.chequeHeight],
+        format: [getChequeDimsMm(tpl).w, getChequeDimsMm(tpl).h],
         orientation: "landscape",
       });
 
@@ -455,7 +610,10 @@ export default function ChequePrintPage() {
 
       selected.forEach((row, idx) => {
         if (idx > 0) {
-          doc.addPage([tpl.chequeWidth, tpl.chequeHeight], "landscape");
+          doc.addPage(
+            [getChequeDimsMm(tpl).w, getChequeDimsMm(tpl).h],
+            "landscape",
+          );
         }
         printChequeOnDoc(doc, tpl, {
           payeeName: row.payee,
@@ -761,7 +919,7 @@ export default function ChequePrintPage() {
               Bulk Cheque Print
             </h2>
 
-            {/* Selection row */}
+            {/* Shared selectors */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div>
                 <Label>Bank Account *</Label>
@@ -771,6 +929,8 @@ export default function ChequePrintPage() {
                     setBulkAccount(v);
                     setBulkBook("");
                     setBulkRows([]);
+                    setImportChequeRows([]);
+                    setImportChequeDone(null);
                   }}
                 >
                   <SelectTrigger>
@@ -792,6 +952,8 @@ export default function ChequePrintPage() {
                   onValueChange={(v) => {
                     setBulkBook(v);
                     buildBulkRows(v);
+                    setImportChequeRows([]);
+                    setImportChequeDone(null);
                   }}
                   disabled={!bulkAccount}
                 >
@@ -824,155 +986,365 @@ export default function ChequePrintPage() {
               </div>
             </div>
 
-            {/* Info bar */}
-            {bulkRows.length > 0 && (
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-sm px-3 py-1">
-                    {bulkAvailableLeaves.length} available leaves
-                  </Badge>
-                  <Badge className="text-sm px-3 py-1 bg-blue-600">
-                    {selectedCount} selected
-                  </Badge>
+            {/* Sub-tab switcher */}
+            <div className="flex gap-1 mb-5 border-b">
+              <button
+                type="button"
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  bulkSubTab === "manual"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setBulkSubTab("manual")}
+                data-ocid="cheque_bulk.tab"
+              >
+                Manual Entry
+              </button>
+              <button
+                type="button"
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors $
+                  bulkSubTab === "import"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"`}
+                onClick={() => setBulkSubTab("import")}
+                data-ocid="cheque_bulk.tab"
+              >
+                Import from Excel
+              </button>
+            </div>
+
+            {/* === Manual Entry sub-tab === */}
+            {bulkSubTab === "manual" && (
+              <div>
+                {importChequeDone !== null && (
+                  <div className="mb-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {importChequeDone} cheque row
+                    {importChequeDone !== 1 ? "s" : ""} imported from Excel —
+                    review and edit below before generating PDF.
+                  </div>
+                )}
+                {/* Info bar */}
+                {bulkRows.length > 0 && (
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="text-sm px-3 py-1">
+                        {bulkAvailableLeaves.length} available leaves
+                      </Badge>
+                      <Badge className="text-sm px-3 py-1 bg-blue-600">
+                        {selectedCount} selected
+                      </Badge>
+                    </div>
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={generateBulkPDF}
+                      disabled={bulkGenerating || selectedCount === 0}
+                      data-ocid="cheque_print.primary_button"
+                    >
+                      <Layers className="w-4 h-4 mr-2" />
+                      {bulkGenerating
+                        ? "Generating..."
+                        : `Generate Bulk PDF (${selectedCount} cheque${selectedCount !== 1 ? "s" : ""})`}
+                    </Button>
+                  </div>
+                )}
+
+                {bulkRows.length === 0 && bulkBook && (
+                  <div className="text-center py-12 text-gray-400">
+                    No available cheque leaves in this book.
+                  </div>
+                )}
+                {bulkRows.length === 0 && !bulkBook && (
+                  <div className="text-center py-12 text-gray-400">
+                    Select an account and cheque book to load available leaves.
+                  </div>
+                )}
+
+                {bulkRows.length > 0 && (
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-3 py-3 w-10">
+                            <Checkbox
+                              checked={allSelected}
+                              onCheckedChange={(c) =>
+                                toggleSelectAll(c === true)
+                              }
+                              data-ocid="cheque_print.checkbox"
+                            />
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Leaf #
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Payee Name *
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Amount *
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Amount in Words
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Date *
+                          </th>
+                          <th className="text-left px-3 py-3 font-medium text-gray-600">
+                            Memo
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkRows.map((row, idx) => (
+                          <tr
+                            key={row.leafId}
+                            className={`border-b ${row.selected ? "bg-blue-50" : "hover:bg-gray-50"}`}
+                            data-ocid={`cheque_print.item.${idx + 1}`}
+                          >
+                            <td className="px-3 py-2">
+                              <Checkbox
+                                checked={row.selected}
+                                onCheckedChange={(c) =>
+                                  updateBulkRow(idx, { selected: c === true })
+                                }
+                                data-ocid={`cheque_print.checkbox.${idx + 1}`}
+                              />
+                            </td>
+                            <td className="px-3 py-2 font-mono text-gray-600">
+                              #{row.leafNumber}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                value={row.payee}
+                                onChange={(e) =>
+                                  updateBulkRow(idx, { payee: e.target.value })
+                                }
+                                placeholder="Payee name"
+                                className={`h-8 min-w-[150px] $row.payee === "" && row.selected ? "border-red-400" : ""`}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                type="number"
+                                value={row.amount}
+                                onChange={(e) =>
+                                  updateBulkRow(idx, { amount: e.target.value })
+                                }
+                                placeholder="0.00"
+                                className={`h-8 w-28 $row.amount === "" && row.selected ? "border-red-400" : ""`}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                value={row.amountWords}
+                                onChange={(e) =>
+                                  updateBulkRow(idx, {
+                                    amountWords: e.target.value,
+                                  })
+                                }
+                                placeholder="Auto-filled"
+                                className="h-8 min-w-[180px]"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                type="date"
+                                value={row.date}
+                                onChange={(e) =>
+                                  updateBulkRow(idx, { date: e.target.value })
+                                }
+                                className="h-8 w-36"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                value={row.memo}
+                                onChange={(e) =>
+                                  updateBulkRow(idx, { memo: e.target.value })
+                                }
+                                placeholder="Optional"
+                                className="h-8 min-w-[120px]"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Generate button at bottom when no info bar */}
+                {bulkRows.length > 0 && selectedCount > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={generateBulkPDF}
+                      disabled={bulkGenerating || selectedCount === 0}
+                      data-ocid="cheque_bulk.primary_button"
+                    >
+                      <Layers className="w-4 h-4 mr-2" />
+                      {bulkGenerating
+                        ? "Generating..."
+                        : `Generate Bulk PDF (${selectedCount} cheque${selectedCount !== 1 ? "s" : ""})`}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* === Import from Excel sub-tab === */}
+            {bulkSubTab === "import" && (
+              <div className="max-w-3xl">
+                {/* Step 1: Download */}
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="font-medium text-blue-800 mb-1">
+                    Step 1 — Download Template
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Download the Excel template with 4 columns: Payee, Amount,
+                    Date (YYYY-MM-DD), Memo. Fill in your cheque data, then
+                    upload it below.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="border-blue-400 text-blue-700 hover:bg-blue-100"
+                    onClick={downloadChequeTemplate}
+                    data-ocid="cheque_import.upload_button"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Excel Template
+                  </Button>
                 </div>
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={generateBulkPDF}
-                  disabled={bulkGenerating || selectedCount === 0}
-                  data-ocid="cheque_print.primary_button"
-                >
-                  <Layers className="w-4 h-4 mr-2" />
-                  {bulkGenerating
-                    ? "Generating..."
-                    : `Generate Bulk PDF (${selectedCount} cheque${
-                        selectedCount !== 1 ? "s" : ""
-                      })`}
-                </Button>
-              </div>
-            )}
 
-            {/* Bulk rows table */}
-            {bulkRows.length === 0 && bulkBook && (
-              <div className="text-center py-12 text-gray-400">
-                No available cheque leaves in this book.
-              </div>
-            )}
-            {bulkRows.length === 0 && !bulkBook && (
-              <div className="text-center py-12 text-gray-400">
-                Select an account and cheque book to load available leaves.
-              </div>
-            )}
+                {/* Step 2: Upload */}
+                <div className="mb-6">
+                  <h3 className="font-medium text-gray-700 mb-2">
+                    Step 2 — Upload Filled Excel File
+                  </h3>
+                  {!bulkBook && (
+                    <p className="text-sm text-amber-600 mb-2">
+                      ⚠ Please select a Cheque Book above before uploading.
+                    </p>
+                  )}
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer $
+                      bulkBook
+                        ? "border-gray-300 hover:border-blue-400"
+                        : "border-gray-200 opacity-60 pointer-events-none"`}
+                    onClick={() => bulkFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") bulkFileInputRef.current?.click();
+                    }}
+                    data-ocid="cheque_import.dropzone"
+                  >
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">
+                      Click to select an .xlsx file
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Columns: Payee, Amount, Date (YYYY-MM-DD), Memo
+                    </p>
+                  </div>
+                  <input
+                    ref={bulkFileInputRef}
+                    type="file"
+                    accept=".xlsx"
+                    className="hidden"
+                    onChange={handleChequeFileUpload}
+                  />
+                </div>
 
-            {bulkRows.length > 0 && (
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-3 py-3 w-10">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={(c) => toggleSelectAll(c === true)}
-                          data-ocid="cheque_print.checkbox"
-                        />
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Leaf #
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Payee Name *
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Amount *
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Amount in Words
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Date *
-                      </th>
-                      <th className="text-left px-3 py-3 font-medium text-gray-600">
-                        Memo
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bulkRows.map((row, idx) => (
-                      <tr
-                        key={row.leafId}
-                        className={`border-b ${
-                          row.selected ? "bg-blue-50" : "hover:bg-gray-50"
-                        }`}
-                        data-ocid={`cheque_print.item.${idx + 1}`}
+                {/* Preview table */}
+                {importChequeRows.length > 0 && (
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-medium text-gray-700">
+                        Step 3 — Review &amp; Apply ({importChequeRows.length}{" "}
+                        rows, {importChequeRows.filter((r) => !r._valid).length}{" "}
+                        errors)
+                      </h3>
+                      <Button
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={applyImportedRows}
+                        disabled={
+                          !importChequeRows.some((r) => r._valid) || !bulkBook
+                        }
+                        data-ocid="cheque_import.submit_button"
                       >
-                        <td className="px-3 py-2">
-                          <Checkbox
-                            checked={row.selected}
-                            onCheckedChange={(c) =>
-                              updateBulkRow(idx, { selected: c === true })
-                            }
-                            data-ocid={`cheque_print.checkbox.${idx + 1}`}
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-mono text-gray-600">
-                          #{row.leafNumber}
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.payee}
-                            onChange={(e) =>
-                              updateBulkRow(idx, { payee: e.target.value })
-                            }
-                            placeholder="Payee name"
-                            className="h-8 min-w-[150px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            value={row.amount}
-                            onChange={(e) =>
-                              updateBulkRow(idx, { amount: e.target.value })
-                            }
-                            placeholder="0.00"
-                            className="h-8 w-28"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.amountWords}
-                            onChange={(e) =>
-                              updateBulkRow(idx, {
-                                amountWords: e.target.value,
-                              })
-                            }
-                            placeholder="Auto-filled"
-                            className="h-8 min-w-[180px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            type="date"
-                            value={row.date}
-                            onChange={(e) =>
-                              updateBulkRow(idx, { date: e.target.value })
-                            }
-                            className="h-8 w-36"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <Input
-                            value={row.memo}
-                            onChange={(e) =>
-                              updateBulkRow(idx, { memo: e.target.value })
-                            }
-                            placeholder="Optional"
-                            className="h-8 min-w-[120px]"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <CheckCircle2 className="w-4 h-4 mr-1" />
+                        Apply {importChequeRows.filter((r) => r._valid).length}{" "}
+                        Valid Row(s) to Table
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Clicking "Apply" will populate the Manual Entry table with
+                      these rows (matched to available cheque leaves). You can
+                      edit them there before generating the PDF.
+                    </p>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600 w-10">
+                              ✓
+                            </th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">
+                              Payee
+                            </th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">
+                              Amount
+                            </th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">
+                              Date
+                            </th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">
+                              Memo
+                            </th>
+                            <th className="text-left px-3 py-2 font-medium text-gray-600">
+                              Error
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importChequeRows.map((row, idx) => (
+                            <tr
+                              key={`icrow-$idx-$String(row.Payee ?? "")`}
+                              className={`border-b ${row._valid ? "hover:bg-gray-50" : "bg-red-50"}`}
+                              data-ocid={`cheque_import.item.${idx + 1}`}
+                            >
+                              <td className="px-3 py-2">
+                                {row._valid ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <AlertCircle className="w-4 h-4 text-red-500" />
+                                )}
+                              </td>
+                              <td
+                                className={`px-3 py-2 $!row._valid && !row.Payee ? "text-red-600 font-medium" : ""`}
+                              >
+                                {String(row.Payee ?? "")}
+                              </td>
+                              <td
+                                className={`px-3 py-2 $!row._valid && (row.Amount === "" || row.Amount === undefined) ? "text-red-600 font-medium" : ""`}
+                              >
+                                {String(row.Amount ?? "")}
+                              </td>
+                              <td className="px-3 py-2">
+                                {String(row["Date (YYYY-MM-DD)"] ?? "")}
+                              </td>
+                              <td className="px-3 py-2 text-gray-500">
+                                {String(row.Memo ?? "")}
+                              </td>
+                              <td className="px-3 py-2 text-red-500 text-xs">
+                                {row._error}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
