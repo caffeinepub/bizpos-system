@@ -293,6 +293,7 @@ const navGroups: NavGroup[] = [
       { path: "/users", label: "Users", icon: Users },
       { path: "/roles", label: "Roles", icon: Shield },
       { path: "/logs", label: "System Logs", icon: FileText },
+      { path: "/tickets", label: "Tickets", icon: LifeBuoy },
       { path: "/settings", label: "Settings", icon: Settings },
     ],
   },
