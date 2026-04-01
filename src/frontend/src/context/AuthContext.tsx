@@ -16,6 +16,9 @@ export interface AuthUser {
   roleId: string;
   roleName: string;
   permissions: string[];
+  isSuperUser: boolean;
+  activeWarehouseId: string | null;
+  assignedWarehouseIds: string[];
 }
 
 interface AuthContextType {
@@ -23,6 +26,7 @@ interface AuthContextType {
   login: (email: string, password: string) => boolean;
   logout: () => void;
   hasPermission: (module: string) => boolean;
+  setActiveWarehouse: (id: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -62,6 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roleId: user.roleId,
         roleName: role.name,
         permissions: role.permissions,
+        isSuperUser: user.isSuperUser === true,
+        activeWarehouseId: null,
+        assignedWarehouseIds: user.assignedWarehouseIds ?? [],
       };
 
       localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
@@ -86,6 +93,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [currentUser],
   );
 
+  const setActiveWarehouse = useCallback((id: string | null) => {
+    setCurrentUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, activeWarehouseId: id };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   // Sync session changes from other tabs
   useEffect(() => {
     const handler = () => {
@@ -97,7 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, hasPermission }}>
+    <AuthContext.Provider
+      value={{ currentUser, login, logout, hasPermission, setActiveWarehouse }}
+    >
       {children}
     </AuthContext.Provider>
   );

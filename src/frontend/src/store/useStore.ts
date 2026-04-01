@@ -16,6 +16,8 @@ export interface User {
   roleId: string;
   status: "Active" | "Inactive";
   createdAt: string;
+  isSuperUser?: boolean;
+  assignedWarehouseIds?: string[];
 }
 
 export interface Account {
@@ -614,6 +616,19 @@ function createSeedData() {
       roleId: "role-admin",
       status: "Active",
       createdAt: "2024-01-01T00:00:00Z",
+      isSuperUser: true,
+      assignedWarehouseIds: [],
+    },
+    {
+      id: "user-super",
+      name: "Super User",
+      email: "superuser@bizpos.com",
+      password: "super123",
+      roleId: "role-admin",
+      status: "Active",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      isSuperUser: true,
+      assignedWarehouseIds: [],
     },
     {
       id: "user-cashier",
@@ -2662,7 +2677,7 @@ const KEYS = {
   leaveTypes: "bizpos_leave_types",
   leaveRequests: "bizpos_leave_requests",
   logs: "bizpos_logs",
-  seeded: "bizpos_seeded_v5",
+  seeded: "bizpos_seeded_v6",
   bankTransactions: "bizpos_bank_transactions",
   purchaseOrders: "bizpos_purchase_orders",
   taxes: "bizpos_taxes",

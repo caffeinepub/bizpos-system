@@ -1,52 +1,49 @@
 # BizPOS System
 
 ## Current State
-A comprehensive frontend-only (localStorage) POS/ERP system with 40+ screens including HR, Accounting, Supply Chain, Bank Management, Inventory, Sales, POS, Reporting, and more. Uses React + TanStack Router, blue/white/green palette, flyout sidebar navigation.
+Full-stack frontend-only React app with 40+ modules. Auth stored in `bizpos_session` localStorage. Users have `id, name, email, password, roleId, status, createdAt`. Roles have permissions array. No super user concept exists. Warehouses are stored as `bizpos_warehouses`. App uses TanStack Router with AppLayout wrapping all protected routes. AuthContext holds `currentUser` with `id, name, email, roleId, roleName, permissions[]`.
+
+Reports Center (`/reports`) covers: Sales, Purchases, Inventory, Financial, Payroll, HR (leave), Activity (expenses). Missing standard reports: warehouse stock cross-location, inter-warehouse transfers, cheque/bank summary, tax collection, supplier aging, customer aging, attendance summary, leave balance, POS shift closing summary.
 
 ## Requested Changes (Diff)
 
 ### Add
-1. **Daily Attendance Module** (`/attendance`)
-   - Simple daily mark per employee: Present / Absent / Half-Day
-   - Date-based view (default today, can navigate by date)
-   - Table of all active employees with attendance status dropdowns
-   - Save/submit attendance for a given date
-   - Monthly attendance summary view per employee
-   - Filters: date, department, status
-   - Excel and PDF export
-   - LocalStorage key: `bizpos_attendance`
-
-2. **Ticket Management Module** (`/tickets`)
-   - Both IT helpdesk (internal) and customer support tickets
-   - Fields: ticket ID, type (IT/Customer), title, description, priority (Low/Medium/High/Critical), status (Open → Assigned → In Progress → Resolved → Closed), assignee, reporter, related customer (optional), created date, updated date
-   - Status workflow: Open → Assigned → In Progress → Resolved → Closed
-   - Two tabs: All Tickets, Create/Edit
-   - Filters: type, status, priority, assignee, date range
-   - Ticket detail view with status change, comments/notes timeline
-   - Excel and PDF export
-   - LocalStorage key: `bizpos_tickets`
-
-3. **Attachments System** (added to key modules)
-   - File upload component (supports images, PDFs, docs up to 5MB stored as base64)
-   - Attachments tab or section on: Employees, Purchases, Sales, Purchase Orders, Tickets, Leave Management, Expenses, Journal Entries, Suppliers, Customers
-   - Display attached files with name, size, type icon, preview (images), download button
-   - LocalStorage keys: `bizpos_attachments_{module}_{recordId}`
+- **Super User flag** on User model: `isSuperUser: boolean`, `assignedWarehouseIds: string[]` (empty = all warehouses)
+- **Warehouse Selection Screen** (`/warehouse-select`): shown after login only for super users, before entering dashboard. Displays all warehouses as tiles/cards with name, location, stock count badge. Clicking a tile selects that warehouse and enters the app in that warehouse's context.
+- **Warehouse Switcher** in top bar (AppLayout header): visible only for super users, shows current active warehouse name with a dropdown to switch to any other assigned warehouse mid-session. Switching updates `activeWarehouseId` in session.
+- **Super User designation in Users page**: Add "Super User" toggle/checkbox in the Add/Edit User dialog. When enabled, show multi-select for warehouse assignment (or "All Warehouses" option). Badge in users table showing "Super User".
+- **AuthContext extension**: add `isSuperUser`, `activeWarehouseId`, `assignedWarehouseIds`, `setActiveWarehouse(id)` to context and session.
+- **Missing Reports** in ReportsPage:
+  - Warehouse tab: "Stock by Warehouse" cross-location summary, "Inter-Warehouse Transfers" report
+  - Banking tab (new category): Cheque Status report, Bank Account Balances, Bank Reconciliation Summary
+  - Tax tab (new category): Tax Collection Summary by period/category
+  - Supplier tab: Supplier Aging report (overdue balances)
+  - Customer tab: Customer Aging report (overdue balances)
+  - HR tab additions: Attendance Summary (by month/employee), Leave Balance report
+  - POS/Operations tab (new or existing): Shift Closing Summary report
 
 ### Modify
-- **AppLayout.tsx**: Add `attendance` and `tickets` routes to HR and a new Support group in sidebar
-- **App.tsx**: Add routes for `/attendance` and `/tickets`
-- **Employees, Purchases, Sales, PO, Leave, Expenses, Journal Entries, Suppliers, Customers pages**: Add Attachments tab/section
-- **RolesPage**: Add `attendance` and `tickets` permission keys
+- **`User` interface** in `useStore.ts`: add `isSuperUser?: boolean`, `assignedWarehouseIds?: string[]`
+- **`AuthUser` interface** in `AuthContext.tsx`: add `isSuperUser: boolean`, `activeWarehouseId: string | null`, `assignedWarehouseIds: string[]`
+- **`AuthContext` login function**: read `isSuperUser` and `assignedWarehouseIds` from user record, store in session
+- **`AuthContext`**: add `setActiveWarehouse(id: string)` function that updates session
+- **App.tsx**: Add `/warehouse-select` route. After login redirect: if `isSuperUser` → `/warehouse-select`, else → `/dashboard`
+- **LoginPage**: after successful login, redirect super users to `/warehouse-select` instead of `/dashboard`
+- **AppLayout**: add warehouse switcher dropdown in header for super users. Show current warehouse name. On switch, call `setActiveWarehouse`.
+- **UsersPage**: add Super User toggle and warehouse multi-select to Add/Edit dialog. Show Super User badge in table.
+- **Seed data in useStore.ts**: add `isSuperUser: true` and `assignedWarehouseIds: []` (all warehouses) to admin seed user. Add a dedicated super user seed: `superuser@bizpos.com / super123`.
+- **ReportsPage**: add new report tabs/categories for Banking, Tax, and extend existing Warehouse, HR, Supplier, Customer categories.
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Create `AttendancePage.tsx` — daily mark UI, monthly summary, filters, export
-2. Create `TicketsPage.tsx` — ticket list with status workflow, detail panel, comments, filters, export
-3. Create `AttachmentManager.tsx` component — reusable file upload/view/download widget using base64 localStorage
-4. Add attachment section to: EmployeesPage, PurchasesPage, SalesListPage, PurchaseOrdersPage, LeaveManagementPage, ExpensesPage, JournalEntriesPage, SuppliersPage, CustomersPage, TicketsPage
-5. Update AppLayout.tsx — add Attendance to HR submenu, add Tickets to a Support group
-6. Update App.tsx — register /attendance and /tickets routes
-7. Update RolesPage — add attendance and tickets permission checkboxes
-8. Seed realistic data: 30 days of attendance for 5 employees, 10 sample tickets
+1. Update `User` interface and `AuthUser` interface to include super user fields
+2. Update `AuthContext` login to populate super user fields + add `setActiveWarehouse`
+3. Create `WarehouseSelectPage.tsx` — grid of warehouse tiles, on click sets active warehouse and navigates to dashboard
+4. Add `/warehouse-select` route in `App.tsx`, update post-login redirect logic
+5. Update `UsersPage.tsx` — super user toggle + warehouse assignment in dialog, Super User badge in table
+6. Update `AppLayout.tsx` — warehouse switcher dropdown in header for super users
+7. Update seed data to include super user fields and a superuser seed account
+8. Extend `ReportsPage.tsx` — add Banking, Tax categories; extend Warehouse (cross-location stock + transfers), HR (attendance summary + leave balance), add Shift Closing report, Supplier Aging, Customer Aging
+9. Ensure new localStorage seed version key (`bizpos_seeded_v6`) triggers fresh seed

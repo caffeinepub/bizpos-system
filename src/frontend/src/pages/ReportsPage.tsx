@@ -2943,7 +2943,1608 @@ export default function ReportsPage() {
             </Tabs>
           </div>
         )}
+
+        {activeCategory === "warehouse" && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Warehouse Reports
+            </h2>
+            <Tabs defaultValue="stock" data-ocid="reports.warehouse.tab">
+              <TabsList className="mb-4">
+                <TabsTrigger
+                  value="stock"
+                  data-ocid="reports.warehouse.stock.tab"
+                >
+                  Stock by Warehouse
+                </TabsTrigger>
+                <TabsTrigger
+                  value="transfers"
+                  data-ocid="reports.warehouse.transfers.tab"
+                >
+                  Inter-Warehouse Transfers
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="stock">
+                <WarehouseStockReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="transfers">
+                <TransfersReport currentUser={currentUser} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
+        {activeCategory === "banking" && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">Banking Reports</h2>
+            <Tabs defaultValue="cheque" data-ocid="reports.banking.tab">
+              <TabsList className="mb-4">
+                <TabsTrigger
+                  value="cheque"
+                  data-ocid="reports.banking.cheque.tab"
+                >
+                  Cheque Status
+                </TabsTrigger>
+                <TabsTrigger
+                  value="accounts"
+                  data-ocid="reports.banking.accounts.tab"
+                >
+                  Bank Account Balances
+                </TabsTrigger>
+                <TabsTrigger
+                  value="reconciliation"
+                  data-ocid="reports.banking.recon.tab"
+                >
+                  Reconciliation Summary
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="cheque">
+                <ChequeStatusReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="accounts">
+                <BankAccountsReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="reconciliation">
+                <ReconciliationReport currentUser={currentUser} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
+        {activeCategory === "tax" && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">Tax Reports</h2>
+            <TaxCollectionReport currentUser={currentUser} />
+          </div>
+        )}
+
+        {activeCategory === "aging" && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">Aging Reports</h2>
+            <Tabs defaultValue="supplier" data-ocid="reports.aging.tab">
+              <TabsList className="mb-4">
+                <TabsTrigger
+                  value="supplier"
+                  data-ocid="reports.aging.supplier.tab"
+                >
+                  Supplier Aging
+                </TabsTrigger>
+                <TabsTrigger
+                  value="customer"
+                  data-ocid="reports.aging.customer.tab"
+                >
+                  Customer Aging
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="supplier">
+                <SupplierAgingReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="customer">
+                <CustomerAgingReport currentUser={currentUser} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
+        {activeCategory === "operations" && (
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Operations Reports
+            </h2>
+            <Tabs defaultValue="shift" data-ocid="reports.operations.tab">
+              <TabsList className="mb-4">
+                <TabsTrigger
+                  value="shift"
+                  data-ocid="reports.operations.shift.tab"
+                >
+                  Shift Closing
+                </TabsTrigger>
+                <TabsTrigger
+                  value="attendance"
+                  data-ocid="reports.operations.attendance.tab"
+                >
+                  Attendance Summary
+                </TabsTrigger>
+                <TabsTrigger
+                  value="leave"
+                  data-ocid="reports.operations.leave.tab"
+                >
+                  Leave Balance
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="shift">
+                <ShiftClosingReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="attendance">
+                <AttendanceSummaryReport currentUser={currentUser} />
+              </TabsContent>
+              <TabsContent value="leave">
+                <LeaveBalanceReport currentUser={currentUser} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
       </main>
     </div>
+  );
+}
+
+// ---- New Report Sub-Components ----
+
+function WarehouseStockReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [whFilter, setWhFilter] = useState("all");
+  const warehouses: {
+    id: string;
+    name: string;
+    location: string;
+    status: string;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const items: {
+    warehouseId?: string;
+    warehouseName?: string;
+    quantity?: number;
+    price?: number;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_items") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const rows = warehouses
+    .filter((w) => whFilter === "all" || w.id === whFilter)
+    .map((w) => {
+      const whItems = items.filter(
+        (i) => i.warehouseId === w.id || i.warehouseName === w.name,
+      );
+      const qty = whItems.reduce((s, i) => s + (i.quantity ?? 0), 0);
+      const val = whItems.reduce(
+        (s, i) => s + (i.quantity ?? 0) * (i.price ?? 0),
+        0,
+      );
+      return {
+        name: w.name,
+        location: w.location,
+        items: whItems.length,
+        qty,
+        val,
+      };
+    });
+
+  const hdrs = [
+    "Warehouse",
+    "Location",
+    "Total Items",
+    "Total Qty",
+    "Total Value",
+  ];
+  const exportRows = rows.map((r) => [
+    r.name,
+    r.location,
+    r.items,
+    r.qty,
+    fmt(r.val),
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Stock by Warehouse</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs">Warehouse</Label>
+            <Select value={whFilter} onValueChange={setWhFilter}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Warehouses</SelectItem>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Stock by Warehouse"
+          headers={hdrs}
+          rows={exportRows}
+          filename="warehouse_stock"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No data
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.name}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="text-gray-500">{r.location}</TableCell>
+                <TableCell>{r.items}</TableCell>
+                <TableCell>{r.qty}</TableCell>
+                <TableCell className="font-mono">{fmt(r.val)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TransfersReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [search, setSearch] = useState("");
+  const [statusF, setStatusF] = useState("all");
+  const [fromF, setFromF] = useState("all");
+  const transfers: {
+    id: string;
+    transferNumber?: string;
+    fromWarehouseName?: string;
+    toWarehouseName?: string;
+    date?: string;
+    status?: string;
+    items?: unknown[];
+  }[] = (() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("bizpos_inventory_transfers") || "[]",
+      );
+    } catch {
+      return [];
+    }
+  })();
+
+  const filtered = transfers.filter((t) => {
+    const matchSearch =
+      !search ||
+      (t.transferNumber ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusF === "all" || t.status === statusF;
+    const matchFrom = fromF === "all" || t.fromWarehouseName === fromF;
+    return matchSearch && matchStatus && matchFrom;
+  });
+
+  const hdrs = ["Transfer#", "From", "To", "Date", "Status", "Items"];
+  const exportRows = filtered.map((t) => [
+    t.transferNumber ?? t.id,
+    t.fromWarehouseName ?? "",
+    t.toWarehouseName ?? "",
+    t.date ?? "",
+    t.status ?? "",
+    t.items?.length ?? 0,
+  ]);
+  const fromOptions = [
+    ...new Set(transfers.map((t) => t.fromWarehouseName).filter(Boolean)),
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Inter-Warehouse Transfers</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <Input
+            placeholder="Search transfer#..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-48"
+          />
+          <div className="space-y-1">
+            <Label className="text-xs">Status</Label>
+            <Select value={statusF} onValueChange={setStatusF}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {["Draft", "In Transit", "Completed", "Cancelled"].map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">From Warehouse</Label>
+            <Select value={fromF} onValueChange={setFromF}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {fromOptions.map((f) => (
+                  <SelectItem key={f as string} value={f as string}>
+                    {f as string}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Inter-Warehouse Transfers"
+          headers={hdrs}
+          rows={exportRows}
+          filename="inventory_transfers"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No transfers
+                </TableCell>
+              </TableRow>
+            )}
+            {filtered.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-mono text-sm">
+                  {t.transferNumber ?? t.id}
+                </TableCell>
+                <TableCell>{t.fromWarehouseName}</TableCell>
+                <TableCell>{t.toWarehouseName}</TableCell>
+                <TableCell>{t.date}</TableCell>
+                <TableCell>
+                  <Badge className="text-xs">{t.status}</Badge>
+                </TableCell>
+                <TableCell>{t.items?.length ?? 0}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ChequeStatusReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [bankF, setBankF] = useState("all");
+  const chequeBooks: {
+    id: string;
+    chequebookNumber?: string;
+    accountNumber?: string;
+    bankName?: string;
+    startLeaf?: number;
+    endLeaf?: number;
+    leaves?: { status?: string }[];
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_cheque_books") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const filtered = chequeBooks.filter(
+    (b) => bankF === "all" || b.bankName === bankF,
+  );
+  const bankOptions = [
+    ...new Set(chequeBooks.map((b) => b.bankName).filter(Boolean)),
+  ];
+
+  const rows = filtered.map((b) => {
+    const leaves = b.leaves ?? [];
+    const total = leaves.length;
+    const used = leaves.filter((l) => l.status === "Used").length;
+    const avail = leaves.filter((l) => l.status === "Available").length;
+    const voided = leaves.filter((l) => l.status === "Voided").length;
+    return {
+      book: b.chequebookNumber ?? b.id,
+      account: b.accountNumber ?? "",
+      bank: b.bankName ?? "",
+      total,
+      used,
+      avail,
+      voided,
+    };
+  });
+
+  const hdrs = [
+    "Cheque Book",
+    "Account",
+    "Bank",
+    "Total Leaves",
+    "Used",
+    "Available",
+    "Voided",
+  ];
+  const exportRows = rows.map((r) => [
+    r.book,
+    r.account,
+    r.bank,
+    r.total,
+    r.used,
+    r.avail,
+    r.voided,
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Cheque Status</CardTitle>
+        <div className="flex gap-3 mt-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Bank</Label>
+            <Select value={bankF} onValueChange={setBankF}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Banks</SelectItem>
+                {bankOptions.map((b) => (
+                  <SelectItem key={b as string} value={b as string}>
+                    {b as string}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Cheque Status"
+          headers={hdrs}
+          rows={exportRows}
+          filename="cheque_status"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No cheque books
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.book}>
+                <TableCell className="font-mono text-sm">{r.book}</TableCell>
+                <TableCell>{r.account}</TableCell>
+                <TableCell>{r.bank}</TableCell>
+                <TableCell>{r.total}</TableCell>
+                <TableCell className="text-orange-600">{r.used}</TableCell>
+                <TableCell className="text-green-600">{r.avail}</TableCell>
+                <TableCell className="text-red-600">{r.voided}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BankAccountsReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [bankF, setBankF] = useState("all");
+  const accounts: {
+    id: string;
+    accountName?: string;
+    bankName?: string;
+    branchName?: string;
+    accountType?: string;
+    currency?: string;
+    balance?: number;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_bank_accounts") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const bankOptions = [
+    ...new Set(accounts.map((a) => a.bankName).filter(Boolean)),
+  ];
+  const filtered = accounts.filter(
+    (a) => bankF === "all" || a.bankName === bankF,
+  );
+
+  const hdrs = [
+    "Account Name",
+    "Bank",
+    "Branch",
+    "Type",
+    "Currency",
+    "Balance",
+  ];
+  const exportRows = filtered.map((a) => [
+    a.accountName ?? "",
+    a.bankName ?? "",
+    a.branchName ?? "",
+    a.accountType ?? "",
+    a.currency ?? "PKR",
+    fmt(a.balance ?? 0),
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Bank Account Balances</CardTitle>
+        <div className="flex gap-3 mt-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Bank</Label>
+            <Select value={bankF} onValueChange={setBankF}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Banks</SelectItem>
+                {bankOptions.map((b) => (
+                  <SelectItem key={b as string} value={b as string}>
+                    {b as string}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Bank Account Balances"
+          headers={hdrs}
+          rows={exportRows}
+          filename="bank_accounts_report"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No accounts
+                </TableCell>
+              </TableRow>
+            )}
+            {filtered.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="font-medium">{a.accountName}</TableCell>
+                <TableCell>{a.bankName}</TableCell>
+                <TableCell>{a.branchName}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{a.accountType}</Badge>
+                </TableCell>
+                <TableCell>{a.currency ?? "PKR"}</TableCell>
+                <TableCell className="font-mono font-bold text-blue-700">
+                  {fmt(a.balance ?? 0)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReconciliationReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [acctF, setAcctF] = useState("all");
+  const recs: {
+    id: string;
+    accountName?: string;
+    date?: string;
+    statementBalance?: number;
+    bookBalance?: number;
+    status?: string;
+  }[] = (() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("bizpos_bank_reconciliation") || "[]",
+      );
+    } catch {
+      return [];
+    }
+  })();
+  const acctOptions = [
+    ...new Set(recs.map((r) => r.accountName).filter(Boolean)),
+  ];
+  const filtered = recs.filter(
+    (r) => acctF === "all" || r.accountName === acctF,
+  );
+
+  const hdrs = [
+    "Account",
+    "Date",
+    "Statement Balance",
+    "Book Balance",
+    "Difference",
+    "Status",
+  ];
+  const exportRows = filtered.map((r) => {
+    const diff = (r.statementBalance ?? 0) - (r.bookBalance ?? 0);
+    return [
+      r.accountName ?? "",
+      r.date ?? "",
+      fmt(r.statementBalance ?? 0),
+      fmt(r.bookBalance ?? 0),
+      fmt(diff),
+      r.status ?? "",
+    ];
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Bank Reconciliation Summary</CardTitle>
+        <div className="flex gap-3 mt-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Account</Label>
+            <Select value={acctF} onValueChange={setAcctF}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                {acctOptions.map((a) => (
+                  <SelectItem key={a as string} value={a as string}>
+                    {a as string}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Bank Reconciliation Summary"
+          headers={hdrs}
+          rows={exportRows}
+          filename="bank_reconciliation_report"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No reconciliation records
+                </TableCell>
+              </TableRow>
+            )}
+            {filtered.map((r) => {
+              const diff = (r.statementBalance ?? 0) - (r.bookBalance ?? 0);
+              return (
+                <TableRow key={r.id}>
+                  <TableCell>{r.accountName}</TableCell>
+                  <TableCell>{r.date}</TableCell>
+                  <TableCell className="font-mono">
+                    {fmt(r.statementBalance ?? 0)}
+                  </TableCell>
+                  <TableCell className="font-mono">
+                    {fmt(r.bookBalance ?? 0)}
+                  </TableCell>
+                  <TableCell
+                    className={`font-mono font-bold ${Math.abs(diff) < 0.01 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {fmt(diff)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className="text-xs">{r.status}</Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TaxCollectionReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [taxNameF, setTaxNameF] = useState("all");
+
+  const sales: {
+    date?: string;
+    tax?: number;
+    taxName?: string;
+    total?: number;
+    subTotal?: number;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_sales") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const taxes: { name?: string; rate?: number }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_taxes") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const filtered = sales.filter((s) => {
+    const d = s.date ?? "";
+    const matchDate = (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo);
+    const matchTax = taxNameF === "all" || s.taxName === taxNameF;
+    return matchDate && matchTax;
+  });
+
+  // Group by tax name
+  const taxMap: Record<
+    string,
+    { taxable: number; collected: number; rate: number }
+  > = {};
+  for (const s of filtered) {
+    const key = s.taxName ?? "Unknown Tax";
+    if (!taxMap[key]) {
+      const t = taxes.find((tx) => tx.name === key);
+      taxMap[key] = { taxable: 0, collected: 0, rate: t?.rate ?? 0 };
+    }
+    taxMap[key].taxable += s.subTotal ?? s.total ?? 0;
+    taxMap[key].collected += s.tax ?? 0;
+  }
+
+  const rows = Object.entries(taxMap).map(([name, v]) => ({ name, ...v }));
+  const taxOptions = [...new Set(sales.map((s) => s.taxName).filter(Boolean))];
+
+  const hdrs = ["Tax Name", "Rate %", "Taxable Amount", "Tax Collected"];
+  const exportRows = rows.map((r) => [
+    r.name,
+    `${r.rate}%`,
+    fmt(r.taxable),
+    fmt(r.collected),
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Tax Collection Summary</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs">Date From</Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Date To</Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Tax Name</Label>
+            <Select value={taxNameF} onValueChange={setTaxNameF}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Taxes</SelectItem>
+                {taxOptions.map((t) => (
+                  <SelectItem key={t as string} value={t as string}>
+                    {t as string}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Tax Collection Summary"
+          headers={hdrs}
+          rows={exportRows}
+          filename="tax_collection"
+          generatedBy={currentUser?.name ?? "Unknown"}
+          filters={[
+            { label: "Date From", value: dateFrom || "All" },
+            { label: "Date To", value: dateTo || "All" },
+          ]}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No tax data
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.name}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell>{r.rate}%</TableCell>
+                <TableCell className="font-mono">{fmt(r.taxable)}</TableCell>
+                <TableCell className="font-mono font-bold text-blue-700">
+                  {fmt(r.collected)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function agingBuckets(
+  items: { date?: string; amount?: number; total?: number; dueDate?: string }[],
+  nameKey: string,
+) {
+  const now = new Date();
+  const result: Record<
+    string,
+    { current: number; d30: number; d60: number; d90: number; total: number }
+  > = {};
+  for (const item of items) {
+    const name =
+      ((item as Record<string, unknown>)[nameKey] as string) ?? "Unknown";
+    if (!result[name])
+      result[name] = { current: 0, d30: 0, d60: 0, d90: 0, total: 0 };
+    const d = new Date(item.dueDate ?? item.date ?? now);
+    const days = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    const amt = item.amount ?? item.total ?? 0;
+    result[name].total += amt;
+    if (days <= 0) result[name].current += amt;
+    else if (days <= 30) result[name].d30 += amt;
+    else if (days <= 60) result[name].d60 += amt;
+    else result[name].d90 += amt;
+  }
+  return Object.entries(result).map(([name, v]) => ({ name, ...v }));
+}
+
+function SupplierAgingReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [search, setSearch] = useState("");
+  const purchases: { supplierName?: string; date?: string; total?: number }[] =
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem("bizpos_purchases") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+  const rows = agingBuckets(
+    purchases.map((p) => ({ ...p })),
+    "supplierName",
+  ).filter(
+    (r) => !search || r.name.toLowerCase().includes(search.toLowerCase()),
+  );
+  const hdrs = [
+    "Supplier",
+    "Current",
+    "30 Days",
+    "60 Days",
+    "90+ Days",
+    "Total",
+  ];
+  const exportRows = rows.map((r) => [
+    r.name,
+    fmt(r.current),
+    fmt(r.d30),
+    fmt(r.d60),
+    fmt(r.d90),
+    fmt(r.total),
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Supplier Aging</CardTitle>
+        <div className="flex gap-3 mt-3">
+          <Input
+            placeholder="Search supplier..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56"
+          />
+        </div>
+        <ExportBar
+          title="Supplier Aging"
+          headers={hdrs}
+          rows={exportRows}
+          filename="supplier_aging"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No data
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.name}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="font-mono text-green-700">
+                  {fmt(r.current)}
+                </TableCell>
+                <TableCell className="font-mono text-yellow-700">
+                  {fmt(r.d30)}
+                </TableCell>
+                <TableCell className="font-mono text-orange-700">
+                  {fmt(r.d60)}
+                </TableCell>
+                <TableCell className="font-mono text-red-700">
+                  {fmt(r.d90)}
+                </TableCell>
+                <TableCell className="font-mono font-bold">
+                  {fmt(r.total)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CustomerAgingReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [search, setSearch] = useState("");
+  const sales: { customerName?: string; date?: string; total?: number }[] =
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem("bizpos_sales") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+  const rows = agingBuckets(
+    sales.map((s) => ({ ...s })),
+    "customerName",
+  ).filter(
+    (r) => !search || r.name.toLowerCase().includes(search.toLowerCase()),
+  );
+  const hdrs = [
+    "Customer",
+    "Current",
+    "30 Days",
+    "60 Days",
+    "90+ Days",
+    "Total",
+  ];
+  const exportRows = rows.map((r) => [
+    r.name,
+    fmt(r.current),
+    fmt(r.d30),
+    fmt(r.d60),
+    fmt(r.d90),
+    fmt(r.total),
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Customer Aging</CardTitle>
+        <div className="flex gap-3 mt-3">
+          <Input
+            placeholder="Search customer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56"
+          />
+        </div>
+        <ExportBar
+          title="Customer Aging"
+          headers={hdrs}
+          rows={exportRows}
+          filename="customer_aging"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No data
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.name}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="font-mono text-green-700">
+                  {fmt(r.current)}
+                </TableCell>
+                <TableCell className="font-mono text-yellow-700">
+                  {fmt(r.d30)}
+                </TableCell>
+                <TableCell className="font-mono text-orange-700">
+                  {fmt(r.d60)}
+                </TableCell>
+                <TableCell className="font-mono text-red-700">
+                  {fmt(r.d90)}
+                </TableCell>
+                <TableCell className="font-mono font-bold">
+                  {fmt(r.total)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ShiftClosingReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [search, setSearch] = useState("");
+  const [statusF, setStatusF] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const closings: {
+    id: string;
+    shopName?: string;
+    shiftName?: string;
+    openedDate?: string;
+    openedBy?: string;
+    expectedCash?: number;
+    actualCash?: number;
+    variance?: number;
+    status?: string;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_shift_closings") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const filtered = closings.filter((c) => {
+    const d = c.openedDate ?? "";
+    return (
+      (!search ||
+        (c.shopName ?? "").toLowerCase().includes(search.toLowerCase())) &&
+      (statusF === "all" || c.status === statusF) &&
+      (!dateFrom || d >= dateFrom) &&
+      (!dateTo || d <= dateTo)
+    );
+  });
+
+  const hdrs = [
+    "Shop",
+    "Shift",
+    "Date",
+    "Opened By",
+    "Expected Cash",
+    "Actual Cash",
+    "Variance",
+    "Status",
+  ];
+  const exportRows = filtered.map((c) => [
+    c.shopName ?? "",
+    c.shiftName ?? "",
+    c.openedDate ?? "",
+    c.openedBy ?? "",
+    fmt(c.expectedCash ?? 0),
+    fmt(c.actualCash ?? 0),
+    fmt(c.variance ?? 0),
+    c.status ?? "",
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Shift Closing Summary</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <Input
+            placeholder="Search shop..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-48"
+          />
+          <div className="space-y-1">
+            <Label className="text-xs">Status</Label>
+            <Select value={statusF} onValueChange={setStatusF}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {["Open", "Closed"].map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Date From</Label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Date To</Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-36"
+            />
+          </div>
+        </div>
+        <ExportBar
+          title="Shift Closing Summary"
+          headers={hdrs}
+          rows={exportRows}
+          filename="shift_closings"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No shift closings
+                </TableCell>
+              </TableRow>
+            )}
+            {filtered.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell>{c.shopName}</TableCell>
+                <TableCell>{c.shiftName}</TableCell>
+                <TableCell>{c.openedDate}</TableCell>
+                <TableCell>{c.openedBy}</TableCell>
+                <TableCell className="font-mono">
+                  {fmt(c.expectedCash ?? 0)}
+                </TableCell>
+                <TableCell className="font-mono">
+                  {fmt(c.actualCash ?? 0)}
+                </TableCell>
+                <TableCell
+                  className={`font-mono font-bold ${(c.variance ?? 0) < 0 ? "text-red-600" : "text-green-600"}`}
+                >
+                  {fmt(c.variance ?? 0)}
+                </TableCell>
+                <TableCell>
+                  <Badge className="text-xs">{c.status}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttendanceSummaryReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [monthF, setMonthF] = useState(new Date().toISOString().slice(0, 7));
+  const [search, setSearch] = useState("");
+  const attendance: {
+    employeeName?: string;
+    date?: string;
+    status?: "Present" | "Absent" | "Half-Day";
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_attendance") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const filtered = attendance.filter((a) => {
+    const month = (a.date ?? "").slice(0, 7);
+    return (
+      (!monthF || month === monthF) &&
+      (!search ||
+        (a.employeeName ?? "").toLowerCase().includes(search.toLowerCase()))
+    );
+  });
+
+  // Group by employee
+  const empMap: Record<
+    string,
+    { present: number; absent: number; halfDay: number }
+  > = {};
+  for (const a of filtered) {
+    const name = a.employeeName ?? "Unknown";
+    if (!empMap[name]) empMap[name] = { present: 0, absent: 0, halfDay: 0 };
+    if (a.status === "Present") empMap[name].present++;
+    else if (a.status === "Absent") empMap[name].absent++;
+    else if (a.status === "Half-Day") empMap[name].halfDay++;
+  }
+
+  const rows = Object.entries(empMap).map(([name, v]) => {
+    const total = v.present + v.absent + v.halfDay;
+    const pct =
+      total > 0 ? Math.round(((v.present + v.halfDay * 0.5) / total) * 100) : 0;
+    return { name, ...v, total, pct };
+  });
+
+  const hdrs = [
+    "Employee",
+    "Present",
+    "Absent",
+    "Half-Day",
+    "Total Days",
+    "Attendance%",
+  ];
+  const exportRows = rows.map((r) => [
+    r.name,
+    r.present,
+    r.absent,
+    r.halfDay,
+    r.total,
+    `${r.pct}%`,
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Attendance Summary</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <div className="space-y-1">
+            <Label className="text-xs">Month</Label>
+            <Input
+              type="month"
+              value={monthF}
+              onChange={(e) => setMonthF(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <Input
+            placeholder="Search employee..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56"
+          />
+        </div>
+        <ExportBar
+          title="Attendance Summary"
+          headers={hdrs}
+          rows={exportRows}
+          filename="attendance_summary"
+          generatedBy={currentUser?.name ?? "Unknown"}
+          filters={[{ label: "Month", value: monthF }]}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No attendance data
+                </TableCell>
+              </TableRow>
+            )}
+            {rows.map((r) => (
+              <TableRow key={r.name}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="text-green-600">{r.present}</TableCell>
+                <TableCell className="text-red-600">{r.absent}</TableCell>
+                <TableCell className="text-yellow-600">{r.halfDay}</TableCell>
+                <TableCell>{r.total}</TableCell>
+                <TableCell>
+                  <span
+                    className={`font-bold ${r.pct >= 80 ? "text-green-600" : r.pct >= 60 ? "text-yellow-600" : "text-red-600"}`}
+                  >
+                    {r.pct}%
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LeaveBalanceReport({
+  currentUser,
+}: { currentUser: { name?: string } | null }) {
+  const [search, setSearch] = useState("");
+  const [typeF, setTypeF] = useState("all");
+  const leaveRequests: {
+    employeeName?: string;
+    leaveTypeName?: string;
+    days?: number;
+    status?: string;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_leave_requests") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  // Group by employee + type
+  const grouped: Record<string, Record<string, number>> = {};
+  for (const r of leaveRequests) {
+    if (r.status !== "Approved") continue;
+    const emp = r.employeeName ?? "Unknown";
+    const type = r.leaveTypeName ?? "General";
+    if (!grouped[emp]) grouped[emp] = {};
+    grouped[emp][type] = (grouped[emp][type] ?? 0) + (r.days ?? 0);
+  }
+
+  const entitlement = 20; // default annual entitlement
+  const rows: {
+    emp: string;
+    type: string;
+    entitlement: number;
+    used: number;
+    remaining: number;
+  }[] = [];
+  for (const [emp, types] of Object.entries(grouped)) {
+    for (const [type, used] of Object.entries(types)) {
+      rows.push({
+        emp,
+        type,
+        entitlement,
+        used,
+        remaining: entitlement - used,
+      });
+    }
+  }
+
+  const filtered = rows.filter((r) => {
+    return (
+      (!search || r.emp.toLowerCase().includes(search.toLowerCase())) &&
+      (typeF === "all" || r.type === typeF)
+    );
+  });
+  const typeOptions = [...new Set(rows.map((r) => r.type))];
+
+  const hdrs = ["Employee", "Leave Type", "Entitlement", "Used", "Remaining"];
+  const exportRows = filtered.map((r) => [
+    r.emp,
+    r.type,
+    r.entitlement,
+    r.used,
+    r.remaining,
+  ]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Leave Balance</CardTitle>
+        <div className="flex gap-3 mt-3 flex-wrap">
+          <Input
+            placeholder="Search employee..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56"
+          />
+          <div className="space-y-1">
+            <Label className="text-xs">Leave Type</Label>
+            <Select value={typeF} onValueChange={setTypeF}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {typeOptions.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <ExportBar
+          title="Leave Balance"
+          headers={hdrs}
+          rows={exportRows}
+          filename="leave_balance"
+          generatedBy={currentUser?.name ?? "Unknown"}
+        />
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {hdrs.map((h) => (
+                <TableHead key={h}>{h}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-gray-400 py-6"
+                >
+                  No leave data
+                </TableCell>
+              </TableRow>
+            )}
+            {filtered.map((r) => (
+              <TableRow key={`${r.emp}-${r.type}`}>
+                <TableCell className="font-medium">{r.emp}</TableCell>
+                <TableCell>{r.type}</TableCell>
+                <TableCell>{r.entitlement}</TableCell>
+                <TableCell className="text-orange-600">{r.used}</TableCell>
+                <TableCell
+                  className={`font-bold ${r.remaining > 5 ? "text-green-600" : "text-red-600"}`}
+                >
+                  {r.remaining}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

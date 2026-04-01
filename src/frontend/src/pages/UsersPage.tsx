@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -34,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Plus, Search, Trash2, Users } from "lucide-react";
+import { Edit, Plus, Search, Shield, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
@@ -52,7 +54,17 @@ export default function UsersPage() {
     password: "",
     roleId: "",
     status: "Active" as "Active" | "Inactive",
+    isSuperUser: false,
+    assignedWarehouseIds: [] as string[],
   });
+
+  const warehouses: { id: string; name: string }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+    } catch {
+      return [];
+    }
+  })();
 
   const filtered = users.filter(
     (u) =>
@@ -68,6 +80,8 @@ export default function UsersPage() {
       password: "",
       roleId: roles[0]?.id || "",
       status: "Active",
+      isSuperUser: false,
+      assignedWarehouseIds: [],
     });
     setDialogOpen(true);
   };
@@ -80,8 +94,19 @@ export default function UsersPage() {
       password: "",
       roleId: user.roleId,
       status: user.status,
+      isSuperUser: user.isSuperUser === true,
+      assignedWarehouseIds: user.assignedWarehouseIds ?? [],
     });
     setDialogOpen(true);
+  };
+
+  const toggleWarehouse = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      assignedWarehouseIds: prev.assignedWarehouseIds.includes(id)
+        ? prev.assignedWarehouseIds.filter((w) => w !== id)
+        : [...prev.assignedWarehouseIds, id],
+    }));
   };
 
   const handleSave = () => {
@@ -99,6 +124,8 @@ export default function UsersPage() {
         email: form.email,
         roleId: form.roleId,
         status: form.status,
+        isSuperUser: form.isSuperUser,
+        assignedWarehouseIds: form.isSuperUser ? form.assignedWarehouseIds : [],
       };
       if (form.password) update.password = form.password;
       updateUser(editingUser.id, update);
@@ -110,6 +137,8 @@ export default function UsersPage() {
         password: form.password,
         roleId: form.roleId,
         status: form.status,
+        isSuperUser: form.isSuperUser,
+        assignedWarehouseIds: form.isSuperUser ? form.assignedWarehouseIds : [],
       });
       toast.success("User created successfully");
     }
@@ -134,7 +163,7 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">
             <div className="p-3 bg-blue-100 rounded-lg">
@@ -172,6 +201,19 @@ export default function UsersPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="flex items-center gap-4 pt-6">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Shield className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Super Users</p>
+              <p className="text-2xl font-bold">
+                {users.filter((u) => u.isSuperUser).length}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -197,6 +239,7 @@ export default function UsersPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Super User</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -206,7 +249,7 @@ export default function UsersPage() {
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center text-muted-foreground py-8"
                     data-ocid="users.empty_state"
                   >
@@ -222,6 +265,16 @@ export default function UsersPage() {
                       <Badge variant="outline">
                         {getRoleName(user.roleId)}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.isSuperUser ? (
+                        <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                          <Shield className="h-3 w-3 mr-1" />
+                          Super User
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -270,7 +323,7 @@ export default function UsersPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="users.dialog">
+        <DialogContent className="max-w-lg" data-ocid="users.dialog">
           <DialogHeader>
             <DialogTitle>
               {editingUser ? "Edit User" : "Add New User"}
@@ -345,6 +398,82 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Super User Toggle */}
+            <div className="flex items-center justify-between rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-purple-600" />
+                <div>
+                  <Label className="text-sm font-medium text-purple-900">
+                    Super User
+                  </Label>
+                  <p className="text-xs text-purple-600">
+                    Can switch between multiple warehouses
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={form.isSuperUser}
+                onCheckedChange={(v) =>
+                  setForm({
+                    ...form,
+                    isSuperUser: v,
+                    assignedWarehouseIds: v ? form.assignedWarehouseIds : [],
+                  })
+                }
+                data-ocid="users.switch"
+              />
+            </div>
+
+            {/* Warehouse Assignment (shown only when Super User is ON) */}
+            {form.isSuperUser && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Warehouse Access</Label>
+                <p className="text-xs text-gray-500">
+                  Select warehouses this super user can access (none selected =
+                  all warehouses)
+                </p>
+                <div className="border rounded-lg divide-y">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-blue-50">
+                    <Checkbox
+                      id="wh-all"
+                      checked={form.assignedWarehouseIds.length === 0}
+                      onCheckedChange={(checked) => {
+                        if (checked)
+                          setForm({ ...form, assignedWarehouseIds: [] });
+                      }}
+                      data-ocid="users.checkbox"
+                    />
+                    <label
+                      htmlFor="wh-all"
+                      className="text-sm font-medium text-blue-700 cursor-pointer"
+                    >
+                      All Warehouses
+                    </label>
+                  </div>
+                  {warehouses.map((wh) => (
+                    <div
+                      key={wh.id}
+                      className="flex items-center gap-3 px-3 py-2"
+                    >
+                      <Checkbox
+                        id={`wh-${wh.id}`}
+                        checked={form.assignedWarehouseIds.includes(wh.id)}
+                        onCheckedChange={() => toggleWarehouse(wh.id)}
+                        data-ocid="users.checkbox"
+                      />
+                      <label
+                        htmlFor={`wh-${wh.id}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {wh.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <Button
                 variant="outline"

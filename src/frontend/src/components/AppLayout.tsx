@@ -1,4 +1,12 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Award,
@@ -11,6 +19,7 @@ import {
   Calculator,
   CalendarCheck,
   CalendarOff,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -282,6 +291,31 @@ const navGroups: NavGroup[] = [
         label: "Expense Reports",
         icon: TrendingDown,
       },
+      {
+        path: "/reports?category=warehouse",
+        label: "Warehouse Reports",
+        icon: Building2,
+      },
+      {
+        path: "/reports?category=banking",
+        label: "Banking Reports",
+        icon: Landmark,
+      },
+      {
+        path: "/reports?category=tax",
+        label: "Tax Reports",
+        icon: Coins,
+      },
+      {
+        path: "/reports?category=aging",
+        label: "Aging Reports",
+        icon: Clock,
+      },
+      {
+        path: "/reports?category=operations",
+        label: "Operations Reports",
+        icon: ClipboardCheck,
+      },
     ],
   },
   {
@@ -298,6 +332,119 @@ const navGroups: NavGroup[] = [
     ],
   },
 ];
+
+function WarehouseSwitcher({ collapsed }: { collapsed: boolean }) {
+  const { currentUser, setActiveWarehouse } = useAuth();
+  const navigate = useNavigate();
+
+  const warehouses: {
+    id: string;
+    name: string;
+    location: string;
+    status: string;
+  }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const assignedIds = currentUser?.assignedWarehouseIds ?? [];
+  const visible =
+    assignedIds.length === 0
+      ? warehouses
+      : warehouses.filter((w) => assignedIds.includes(w.id));
+  const active = warehouses.find(
+    (w) => w.id === currentUser?.activeWarehouseId,
+  );
+
+  const select = (id: string | null) => {
+    setActiveWarehouse(id);
+    navigate({ to: "/dashboard" });
+  };
+
+  if (collapsed) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center justify-center px-3 py-2 mb-1 rounded-lg text-blue-300 hover:bg-slate-700 hover:text-white transition-colors"
+            title={active ? active.name : "All Warehouses"}
+            data-ocid="nav.warehouse_switcher.button"
+          >
+            <Building2 className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" className="w-52">
+          <DropdownMenuItem
+            onClick={() => select(null)}
+            data-ocid="nav.warehouse_all.button"
+          >
+            <span className="font-medium">All Warehouses</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {visible.map((wh) => (
+            <DropdownMenuItem key={wh.id} onClick={() => select(wh.id)}>
+              {wh.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  return (
+    <div className="px-2 pb-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 hover:text-blue-200 transition-colors text-xs"
+            data-ocid="nav.warehouse_switcher.button"
+          >
+            <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="flex-1 truncate text-left font-medium">
+              {active ? active.name : "All Warehouses"}
+            </span>
+            <ChevronDown className="h-3 w-3 opacity-60" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="w-52">
+          <DropdownMenuItem
+            onClick={() => select(null)}
+            data-ocid="nav.warehouse_all.button"
+          >
+            <span className="font-medium">All Warehouses</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {visible.map((wh) => (
+            <DropdownMenuItem
+              key={wh.id}
+              onClick={() => select(wh.id)}
+              className={
+                currentUser?.activeWarehouseId === wh.id
+                  ? "bg-blue-50 text-blue-700"
+                  : ""
+              }
+            >
+              {wh.name}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => navigate({ to: "/warehouse-select" })}
+            className="text-blue-600 text-xs"
+            data-ocid="nav.warehouse_select.button"
+          >
+            Switch Warehouse...
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
 
 export default function AppLayout() {
   const { currentUser, logout, hasPermission } = useAuth();
@@ -456,6 +603,9 @@ export default function AppLayout() {
 
         {/* User info */}
         <div className="border-t border-slate-700 p-2">
+          {!collapsed && currentUser?.isSuperUser && (
+            <WarehouseSwitcher collapsed={false} />
+          )}
           {!collapsed && (
             <div className="px-2 py-1 mb-1">
               <p className="text-white text-xs font-medium truncate">
@@ -463,8 +613,16 @@ export default function AppLayout() {
               </p>
               <p className="text-slate-400 text-xs truncate">
                 {currentUser?.roleName}
+                {currentUser?.isSuperUser && (
+                  <Badge className="ml-1 text-[10px] px-1 py-0 bg-purple-600 text-white border-0 align-middle">
+                    Super
+                  </Badge>
+                )}
               </p>
             </div>
+          )}
+          {collapsed && currentUser?.isSuperUser && (
+            <WarehouseSwitcher collapsed={true} />
           )}
           <button
             type="button"
