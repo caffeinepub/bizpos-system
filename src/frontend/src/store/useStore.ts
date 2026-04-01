@@ -3496,6 +3496,51 @@ function initStore() {
 
 initStore();
 
+// Always ensure super user and default accounts exist regardless of seed state
+(function ensureSuperUser() {
+  const users = load<User[]>(KEYS.users, []);
+  const hasSuperUser = users.some((u) => u.email === "superuser@bizpos.com");
+  if (!hasSuperUser) {
+    const superUser: User = {
+      id: "user-super",
+      name: "Super User",
+      email: "superuser@bizpos.com",
+      password: "super123",
+      roleId: "role-admin",
+      status: "Active",
+      createdAt: new Date().toISOString(),
+      isSuperUser: true,
+      assignedWarehouseIds: [],
+    };
+    save(KEYS.users, [...users, superUser]);
+  } else {
+    // Ensure existing super user has isSuperUser flag and correct password
+    const updated = users.map((u) =>
+      u.email === "superuser@bizpos.com"
+        ? { ...u, isSuperUser: true, password: "super123", status: "Active" }
+        : u,
+    );
+    save(KEYS.users, updated);
+  }
+  // Also ensure admin has isSuperUser flag
+  const users2 = load<User[]>(KEYS.users, []);
+  const hasAdmin = users2.some((u) => u.email === "admin@bizpos.com");
+  if (!hasAdmin) {
+    const adminUser: User = {
+      id: "user-admin",
+      name: "System Admin",
+      email: "admin@bizpos.com",
+      password: "admin123",
+      roleId: "role-admin",
+      status: "Active",
+      createdAt: new Date().toISOString(),
+      isSuperUser: true,
+      assignedWarehouseIds: [],
+    };
+    save(KEYS.users, [...users2, adminUser]);
+  }
+})();
+
 // Ensure taxes/discounts/promotions exist even if seeded flag was already set
 (function ensurePricingData() {
   const generateIdLocal = () =>
