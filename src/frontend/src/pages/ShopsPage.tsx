@@ -36,7 +36,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Building2, Edit, Plus, Search, Store, Trash2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import {
+  Building2,
+  ChevronRight,
+  Edit,
+  Plus,
+  Search,
+  Store,
+  Trash2,
+  Warehouse,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
@@ -49,6 +59,7 @@ export default function ShopsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
   const [filterWarehouse, setFilterWarehouse] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
@@ -146,6 +157,30 @@ export default function ShopsPage() {
           <Plus className="h-4 w-4 mr-2" />
           Add Shop
         </Button>
+      </div>
+
+      {/* Hierarchy Breadcrumb */}
+      <div className="flex items-center gap-1.5 text-sm bg-blue-50 border border-blue-100 rounded-lg px-4 py-2">
+        <Building2 className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/companies" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Companies
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <Warehouse className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/warehouses" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Warehouses
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <Store className="h-4 w-4 text-blue-700" />
+        <span className="font-semibold text-blue-700">Shops</span>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -263,7 +298,15 @@ export default function ShopsPage() {
                       {shop.name}
                     </div>
                   </TableCell>
-                  <TableCell>{shop.warehouseName}</TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      onClick={() => navigate({ to: "/warehouses" })}
+                      className="text-blue-600 hover:underline cursor-pointer"
+                    >
+                      {shop.warehouseName}
+                    </button>
+                  </TableCell>
                   <TableCell className="text-gray-600 text-sm">
                     {shop.address || "-"}
                   </TableCell>

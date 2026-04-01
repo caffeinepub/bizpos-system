@@ -157,7 +157,8 @@ const navGroups: NavGroup[] = [
     icon: Building2,
     module: "warehouse",
     subItems: [
-      { path: "/warehouses", label: "Warehouses", icon: Building2 },
+      { path: "/companies", label: "Companies", icon: Building2 },
+      { path: "/warehouses", label: "Warehouses", icon: Warehouse },
       { path: "/shops", label: "Shops", icon: Store },
     ],
   },

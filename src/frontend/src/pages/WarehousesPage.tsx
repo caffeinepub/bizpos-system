@@ -39,16 +39,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Building2,
+  ChevronRight,
   Edit,
   ExternalLink,
   Plus,
   Store,
   Trash2,
+  Warehouse as WHIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
-import type { Warehouse } from "../store/useStore";
+import type { Warehouse as WarehouseType } from "../store/useStore";
 
 export default function WarehousesPage() {
   const { warehouses, shops, addWarehouse, updateWarehouse, deleteWarehouse } =
@@ -65,9 +67,8 @@ export default function WarehousesPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(
-    null,
-  );
+  const [editingWarehouse, setEditingWarehouse] =
+    useState<WarehouseType | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string | null>(
     null,
   );
@@ -83,7 +84,7 @@ export default function WarehousesPage() {
     setForm({ name: "", location: "", companyId: "", status: "Active" });
     setDialogOpen(true);
   };
-  const openEdit = (w: Warehouse) => {
+  const openEdit = (w: WarehouseType) => {
     setEditingWarehouse(w);
     setForm({
       name: w.name,
@@ -135,6 +136,30 @@ export default function WarehousesPage() {
         </Button>
       </div>
 
+      {/* Hierarchy Breadcrumb */}
+      <div className="flex items-center gap-1.5 text-sm bg-blue-50 border border-blue-100 rounded-lg px-4 py-2">
+        <Building2 className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/companies" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Companies
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <WHIcon className="h-4 w-4 text-blue-700" />
+        <span className="font-semibold text-blue-700">Warehouses</span>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <Store className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/shops" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Shops
+        </button>
+      </div>
+
       <Tabs defaultValue="list">
         <TabsList data-ocid="warehouses.tab">
           <TabsTrigger value="list">Warehouses</TabsTrigger>
@@ -170,12 +195,26 @@ export default function WarehousesPage() {
                           {w.name}
                         </div>
                       </TableCell>
-                      <TableCell className="text-gray-600 text-sm">
-                        {companies.find(
-                          (c) =>
-                            c.id ===
-                            (w as unknown as { companyId?: string }).companyId,
-                        )?.name || <span className="text-gray-400">—</span>}
+                      <TableCell className="text-sm">
+                        {(() => {
+                          const cName = companies.find(
+                            (c) =>
+                              c.id ===
+                              (w as unknown as { companyId?: string })
+                                .companyId,
+                          )?.name;
+                          return cName ? (
+                            <button
+                              type="button"
+                              onClick={() => navigate({ to: "/companies" })}
+                              className="text-blue-600 hover:underline cursor-pointer"
+                            >
+                              {cName}
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-gray-600">
                         {w.location}

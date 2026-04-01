@@ -35,7 +35,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Building2, Edit, Plus, Search, Trash2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import {
+  Building2,
+  ChevronRight,
+  Edit,
+  Plus,
+  Search,
+  Store,
+  Trash2,
+  Warehouse,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -69,6 +79,7 @@ function generateId() {
 }
 
 export default function CompaniesPage() {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>(() =>
     load<Company[]>("bizpos_companies", []),
   );
@@ -167,6 +178,30 @@ export default function CompaniesPage() {
           <Plus className="h-4 w-4 mr-2" />
           Add Company
         </Button>
+      </div>
+
+      {/* Hierarchy Breadcrumb */}
+      <div className="flex items-center gap-1.5 text-sm bg-blue-50 border border-blue-100 rounded-lg px-4 py-2">
+        <Building2 className="h-4 w-4 text-blue-700" />
+        <span className="font-semibold text-blue-700">Companies</span>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <Warehouse className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/warehouses" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Warehouses
+        </button>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        <Store className="h-4 w-4 text-gray-400" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/shops" })}
+          className="text-blue-600 hover:underline cursor-pointer"
+        >
+          Shops
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -298,6 +333,15 @@ export default function CompaniesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate({ to: "/warehouses" })}
+                          data-ocid={`companies.secondary_button.${i + 1}`}
+                          title="View Warehouses"
+                        >
+                          <Warehouse className="h-4 w-4 text-blue-500" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
