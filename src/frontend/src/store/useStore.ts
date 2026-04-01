@@ -8,6 +8,16 @@ export interface Role {
   permissions: string[];
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  email: string;
+  status: "Active" | "Inactive";
+}
+
 export interface User {
   id: string;
   name: string;
@@ -17,7 +27,9 @@ export interface User {
   status: "Active" | "Inactive";
   createdAt: string;
   isSuperUser?: boolean;
+  assignedCompanyId?: string;
   assignedWarehouseIds?: string[];
+  assignedShopIds?: string[];
 }
 
 export interface Account {
@@ -57,6 +69,7 @@ export interface Warehouse {
   id: string;
   name: string;
   location: string;
+  companyId?: string;
   status: "Active" | "Inactive";
 }
 
@@ -616,8 +629,10 @@ function createSeedData() {
       roleId: "role-admin",
       status: "Active",
       createdAt: "2024-01-01T00:00:00Z",
-      isSuperUser: true,
+      isSuperUser: false,
+      assignedCompanyId: "comp1",
       assignedWarehouseIds: [],
+      assignedShopIds: [],
     },
     {
       id: "user-super",
@@ -628,7 +643,9 @@ function createSeedData() {
       status: "Active",
       createdAt: "2024-01-01T00:00:00.000Z",
       isSuperUser: true,
+      assignedCompanyId: undefined,
       assignedWarehouseIds: [],
+      assignedShopIds: [],
     },
     {
       id: "user-cashier",
@@ -638,6 +655,10 @@ function createSeedData() {
       roleId: "role-cashier",
       status: "Active",
       createdAt: "2024-01-15T00:00:00Z",
+      isSuperUser: false,
+      assignedCompanyId: "comp1",
+      assignedWarehouseIds: ["wh1"],
+      assignedShopIds: ["shop1"],
     },
   ];
 
@@ -1474,58 +1495,87 @@ function createSeedData() {
   ];
   const warehouses: Warehouse[] = [
     {
-      id: "wh-001",
+      id: "wh1",
       name: "Main Warehouse",
-      location: "Lahore, Pakistan",
+      location: "New York - Downtown",
+      companyId: "comp1",
       status: "Active",
     },
     {
-      id: "wh-002",
-      name: "Branch Store",
-      location: "Karachi, Pakistan",
+      id: "wh2",
+      name: "North Warehouse",
+      location: "New York - Uptown",
+      companyId: "comp1",
+      status: "Active",
+    },
+    {
+      id: "wh3",
+      name: "Central Hub",
+      location: "Chicago - Central",
+      companyId: "comp2",
       status: "Active",
     },
   ];
 
   const shops: Shop[] = [
     {
-      id: "shop-001",
-      name: "Main Branch",
-      code: "SH-001",
-      address: "Hall Road, Lahore",
-      warehouseId: "wh-001",
+      id: "shop1",
+      name: "Downtown Shop A",
+      code: "DSA",
+      address: "10 Main St",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       status: "Active",
       assignedUserIds: ["user-admin", "user-cashier"],
     },
     {
-      id: "shop-002",
-      name: "North Branch",
-      code: "SH-002",
-      address: "Township, Lahore",
-      warehouseId: "wh-001",
+      id: "shop2",
+      name: "Downtown Shop B",
+      code: "DSB",
+      address: "20 Main St",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       status: "Active",
       assignedUserIds: [],
     },
     {
-      id: "shop-003",
-      name: "South Outlet",
-      code: "SH-003",
-      address: "Saddar, Karachi",
-      warehouseId: "wh-002",
-      warehouseName: "Branch Store",
+      id: "shop3",
+      name: "North Shop C",
+      code: "NSC",
+      address: "5 Uptown Blvd",
+      warehouseId: "wh2",
+      warehouseName: "North Warehouse",
       status: "Active",
       assignedUserIds: [],
     },
     {
-      id: "shop-004",
-      name: "East Outlet",
-      code: "SH-004",
-      address: "Clifton, Karachi",
-      warehouseId: "wh-002",
-      warehouseName: "Branch Store",
-      status: "Inactive",
+      id: "shop4",
+      name: "North Shop D",
+      code: "NSD",
+      address: "15 Uptown Blvd",
+      warehouseId: "wh2",
+      warehouseName: "North Warehouse",
+      status: "Active",
+      assignedUserIds: [],
+    },
+    {
+      id: "shop5",
+      name: "Hub Shop E",
+      code: "HSE",
+      address: "100 Commerce Ave",
+      warehouseId: "wh3",
+      warehouseName: "Central Hub",
+      status: "Active",
+      assignedUserIds: [],
+    },
+    {
+      id: "shop6",
+      name: "Hub Shop F",
+      code: "HSF",
+      address: "200 Commerce Ave",
+      warehouseId: "wh3",
+      warehouseName: "Central Hub",
+      status: "Active",
       assignedUserIds: [],
     },
   ];
@@ -1742,7 +1792,7 @@ function createSeedData() {
       costPrice: 45000,
       salePrice: 55000,
       quantity: 25,
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
     },
     {
       id: "item-002",
@@ -1752,7 +1802,7 @@ function createSeedData() {
       costPrice: 800,
       salePrice: 1500,
       quantity: 150,
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
     },
     {
       id: "item-003",
@@ -1762,7 +1812,7 @@ function createSeedData() {
       costPrice: 250,
       salePrice: 600,
       quantity: 8,
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
     },
     {
       id: "item-004",
@@ -1772,7 +1822,7 @@ function createSeedData() {
       costPrice: 3500,
       salePrice: 6500,
       quantity: 45,
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
     },
     {
       id: "item-005",
@@ -1782,7 +1832,7 @@ function createSeedData() {
       costPrice: 150,
       salePrice: 400,
       quantity: 200,
-      warehouseId: "wh-002",
+      warehouseId: "wh2",
     },
     {
       id: "item-006",
@@ -1792,7 +1842,7 @@ function createSeedData() {
       costPrice: 2500,
       salePrice: 4500,
       quantity: 30,
-      warehouseId: "wh-002",
+      warehouseId: "wh2",
     },
   ];
 
@@ -1853,7 +1903,7 @@ function createSeedData() {
       id: "SALE-001",
       customerId: "cust-001",
       customerName: "Ahmed Ali",
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       shopId: "shop-001",
       saleType: "Cash",
@@ -1886,7 +1936,7 @@ function createSeedData() {
       id: "SALE-002",
       customerId: "cust-002",
       customerName: "Sara Khan",
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       shopId: "shop-001",
       saleType: "Credit",
@@ -1915,7 +1965,7 @@ function createSeedData() {
       id: "PUR-001",
       supplierId: "sup-001",
       supplierName: "Tech Distributors Ltd",
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       purchaseDate: "2024-03-01",
       items: [
@@ -1936,7 +1986,7 @@ function createSeedData() {
       id: "PUR-002",
       supplierId: "sup-002",
       supplierName: "Galaxy Electronics",
-      warehouseId: "wh-001",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       purchaseDate: "2024-03-10",
       items: [
@@ -2555,7 +2605,7 @@ function createSeedData() {
       poNumber: "PO-2025-001",
       supplierId: "sup-1",
       supplierName: "TechSupply Co.",
-      warehouseId: "wh-1",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       date: "2025-03-01",
       expectedDelivery: "2025-03-10",
@@ -2583,7 +2633,7 @@ function createSeedData() {
       poNumber: "PO-2025-002",
       supplierId: "sup-2",
       supplierName: "Global Merchandise Ltd",
-      warehouseId: "wh-1",
+      warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       date: "2025-03-05",
       expectedDelivery: "2025-03-20",
@@ -2611,7 +2661,7 @@ function createSeedData() {
       poNumber: "PO-2025-003",
       supplierId: "sup-1",
       supplierName: "TechSupply Co.",
-      warehouseId: "wh-2",
+      warehouseId: "wh2",
       warehouseName: "Secondary Warehouse",
       date: "2025-03-12",
       expectedDelivery: "2025-03-25",
@@ -2630,10 +2680,32 @@ function createSeedData() {
     },
   ];
 
+  const companies: Company[] = [
+    {
+      id: "comp1",
+      name: "Alpha Retail Group",
+      code: "ARG",
+      address: "123 Main St, New York",
+      phone: "+1-555-0100",
+      email: "info@alpharetail.com",
+      status: "Active",
+    },
+    {
+      id: "comp2",
+      name: "Beta Distribution Co",
+      code: "BDC",
+      address: "456 Commerce Ave, Chicago",
+      phone: "+1-555-0200",
+      email: "info@betadist.com",
+      status: "Active",
+    },
+  ];
+
   return {
     roles,
     users,
     accounts,
+    companies,
     warehouses,
     shops,
     employees,
@@ -2658,6 +2730,7 @@ function createSeedData() {
 // ---- LocalStorage Keys ----
 const KEYS = {
   roles: "bizpos_roles",
+  companies: "bizpos_companies",
   users: "bizpos_users",
   accounts: "bizpos_accounts_v3",
   warehouses: "bizpos_warehouses",
@@ -2677,7 +2750,7 @@ const KEYS = {
   leaveTypes: "bizpos_leave_types",
   leaveRequests: "bizpos_leave_requests",
   logs: "bizpos_logs",
-  seeded: "bizpos_seeded_v6",
+  seeded: "bizpos_seeded_v8",
   bankTransactions: "bizpos_bank_transactions",
   purchaseOrders: "bizpos_purchase_orders",
   taxes: "bizpos_taxes",
@@ -2717,6 +2790,7 @@ function initStore() {
     save(KEYS.roles, seed.roles);
     save(KEYS.users, seed.users);
     save(KEYS.accounts, seed.accounts);
+    save(KEYS.companies, seed.companies);
     save(KEYS.warehouses, seed.warehouses);
     save(KEYS.shops, seed.shops);
     save(KEYS.employees, seed.employees);
@@ -3631,6 +3705,7 @@ initStore();
 
 // ---- Store State ----
 interface StoreState {
+  companies: Company[];
   roles: Role[];
   users: User[];
   accounts: Account[];
@@ -3671,6 +3746,7 @@ interface StoreState {
 
 function readAll(): StoreState {
   return {
+    companies: load<Company[]>(KEYS.companies, []),
     roles: load<Role[]>(KEYS.roles, []),
     users: load<User[]>(KEYS.users, []),
     accounts: load<Account[]>(KEYS.accounts, []),
@@ -3768,6 +3844,28 @@ export function useStore() {
     save(
       KEYS.roles,
       load<Role[]>(KEYS.roles, []).filter((r) => r.id !== id),
+    );
+  }, []);
+
+  // ---- Companies ----
+  const addCompany = useCallback((company: Omit<Company, "id">) => {
+    save(KEYS.companies, [
+      ...load<Company[]>(KEYS.companies, []),
+      { ...company, id: `comp-${Date.now()}` },
+    ]);
+  }, []);
+  const updateCompany = useCallback((id: string, company: Partial<Company>) => {
+    save(
+      KEYS.companies,
+      load<Company[]>(KEYS.companies, []).map((c) =>
+        c.id === id ? { ...c, ...company } : c,
+      ),
+    );
+  }, []);
+  const deleteCompany = useCallback((id: string) => {
+    save(
+      KEYS.companies,
+      load<Company[]>(KEYS.companies, []).filter((c) => c.id !== id),
     );
   }, []);
 
@@ -4718,6 +4816,9 @@ export function useStore() {
     addRole,
     updateRole,
     deleteRole,
+    addCompany,
+    updateCompany,
+    deleteCompany,
     addUser,
     updateUser,
     deleteUser,

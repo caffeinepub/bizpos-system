@@ -324,6 +324,7 @@ const navGroups: NavGroup[] = [
     icon: Shield,
     module: "users",
     subItems: [
+      { path: "/companies", label: "Companies", icon: Building2 },
       { path: "/users", label: "Users", icon: Users },
       { path: "/roles", label: "Roles", icon: Shield },
       { path: "/logs", label: "System Logs", icon: FileText },
@@ -484,7 +485,18 @@ export default function AppLayout() {
     setFlyout({ key, y: rect.top });
   };
 
-  const visibleGroups = navGroups.filter((g) => hasPermission(g.module));
+  const visibleGroups = navGroups
+    .filter((g) => hasPermission(g.module))
+    .map((g) => {
+      if (g.key === "admin" && !currentUser?.isSuperUser) {
+        // Hide Companies from non-super users
+        return {
+          ...g,
+          subItems: g.subItems?.filter((s) => s.path !== "/companies"),
+        };
+      }
+      return g;
+    });
 
   const isActive = (path: string) => {
     const p = path.split("?")[0];
@@ -608,6 +620,57 @@ export default function AppLayout() {
           )}
           {!collapsed && (
             <div className="px-2 py-1 mb-1">
+              {!currentUser?.isSuperUser && currentUser?.activeCompanyId && (
+                <p className="text-blue-300 text-[10px] font-medium truncate mb-0.5">
+                  {(() => {
+                    try {
+                      const companies = JSON.parse(
+                        localStorage.getItem("bizpos_companies") || "[]",
+                      );
+                      const c = companies.find(
+                        (x: { id: string }) =>
+                          x.id === currentUser.activeCompanyId,
+                      );
+                      return c ? c.name : "";
+                    } catch {
+                      return "";
+                    }
+                  })()}
+                </p>
+              )}
+              {currentUser?.isSuperUser && currentUser?.activeCompanyId && (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/company-select" })}
+                  className="text-blue-300 text-[10px] font-medium truncate mb-0.5 hover:text-blue-200 flex items-center gap-1 w-full text-left"
+                >
+                  <Building2 className="h-3 w-3 flex-shrink-0" />
+                  {(() => {
+                    try {
+                      const companies = JSON.parse(
+                        localStorage.getItem("bizpos_companies") || "[]",
+                      );
+                      const c = companies.find(
+                        (x: { id: string }) =>
+                          x.id === currentUser.activeCompanyId,
+                      );
+                      return c ? c.name : "Switch Company";
+                    } catch {
+                      return "Switch Company";
+                    }
+                  })()}
+                </button>
+              )}
+              {currentUser?.isSuperUser && !currentUser?.activeCompanyId && (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/company-select" })}
+                  className="text-blue-300 text-[10px] font-medium mb-0.5 hover:text-blue-200 flex items-center gap-1 w-full text-left"
+                >
+                  <Building2 className="h-3 w-3 flex-shrink-0" />
+                  Select Company
+                </button>
+              )}
               <p className="text-white text-xs font-medium truncate">
                 {currentUser?.name}
               </p>

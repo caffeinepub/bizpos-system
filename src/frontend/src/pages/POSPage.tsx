@@ -40,7 +40,7 @@ export default function POSPage() {
     promotions,
     addSale,
   } = useStore();
-  const { currentUser } = useAuth();
+  const { currentUser, getAccessibleShopIds } = useAuth();
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
@@ -69,11 +69,20 @@ export default function POSPage() {
     }
   }, [currentUser, shops]);
 
+  const accessibleShopIds = getAccessibleShopIds();
   const userShops = currentUser
-    ? shops.filter(
-        (s) =>
-          s.status === "Active" && s.assignedUserIds.includes(currentUser.id),
-      )
+    ? shops.filter((s) => {
+        const inAssigned =
+          s.status === "Active" && s.assignedUserIds.includes(currentUser.id);
+        const inAccessible =
+          accessibleShopIds.length === 0 || accessibleShopIds.includes(s.id);
+        return (
+          inAssigned ||
+          (accessibleShopIds.length > 0 &&
+            inAccessible &&
+            s.status === "Active")
+        );
+      })
     : [];
 
   const selectedShop = shops.find((s) => s.id === selectedShopId);

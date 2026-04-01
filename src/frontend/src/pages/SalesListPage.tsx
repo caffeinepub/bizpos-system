@@ -43,7 +43,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function SalesListPage() {
   const { sales, warehouses, deleteSale } = useStore();
-  const { currentUser } = useAuth();
+  const { currentUser, getAccessibleShopIds } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filterWarehouse, setFilterWarehouse] = useState("all");
@@ -51,6 +51,7 @@ export default function SalesListPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const accessibleShopIds = getAccessibleShopIds();
   const filtered = sales.filter((s) => {
     const matchSearch =
       s.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -59,7 +60,13 @@ export default function SalesListPage() {
       filterWarehouse === "all" || s.warehouseId === filterWarehouse;
     const matchType = filterType === "all" || s.saleType === filterType;
     const matchStatus = filterStatus === "all" || s.status === filterStatus;
-    return matchSearch && matchWarehouse && matchType && matchStatus;
+    const matchShop =
+      accessibleShopIds.length === 0 ||
+      !s.shopId ||
+      accessibleShopIds.includes(s.shopId as string);
+    return (
+      matchSearch && matchWarehouse && matchType && matchStatus && matchShop
+    );
   });
 
   const totalSales = filtered.reduce((s, sale) => s + sale.total, 0);

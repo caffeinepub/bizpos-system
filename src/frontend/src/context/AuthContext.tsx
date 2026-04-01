@@ -17,8 +17,11 @@ export interface AuthUser {
   roleName: string;
   permissions: string[];
   isSuperUser: boolean;
+  activeCompanyId: string | null;
+  assignedCompanyId: string | null;
   activeWarehouseId: string | null;
   assignedWarehouseIds: string[];
+  assignedShopIds: string[];
 }
 
 interface AuthContextType {
@@ -27,6 +30,9 @@ interface AuthContextType {
   logout: () => void;
   hasPermission: (module: string) => boolean;
   setActiveWarehouse: (id: string | null) => void;
+  setActiveCompany: (id: string | null) => void;
+  getAccessibleShopIds: () => string[];
+  getAccessibleWarehouseIds: () => string[];
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -59,6 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const role = roles.find((r: { id: string }) => r.id === user.roleId);
       if (!role) return false;
 
+      const isSuperUser = user.isSuperUser === true;
+      const assignedCompanyId = user.assignedCompanyId ?? null;
+
       const authUser: AuthUser = {
         id: user.id,
         name: user.name,
@@ -66,9 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roleId: user.roleId,
         roleName: role.name,
         permissions: role.permissions,
-        isSuperUser: user.isSuperUser === true,
+        isSuperUser,
+        activeCompanyId: isSuperUser ? null : assignedCompanyId,
+        assignedCompanyId,
         activeWarehouseId: null,
         assignedWarehouseIds: user.assignedWarehouseIds ?? [],
+        assignedShopIds: user.assignedShopIds ?? [],
       };
 
       localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
@@ -102,6 +114,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setActiveCompany = useCallback((id: string | null) => {
+    setCurrentUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, activeCompanyId: id };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const getAccessibleShopIds = useCallback((): string[] => {
+    if (!currentUser) return [];
+    if (currentUser.assignedShopIds.length > 0)
+      return currentUser.assignedShopIds;
+    // if has specific warehouses, get all shops in those
+    if (currentUser.assignedWarehouseIds.length > 0) {
+      try {
+        const shops = JSON.parse(localStorage.getItem("bizpos_shops") || "[]");
+        return shops
+          .filter((s: { warehouseId: string }) =>
+            currentUser.assignedWarehouseIds.includes(s.warehouseId),
+          )
+          .map((s: { id: string }) => s.id);
+      } catch {
+        return [];
+      }
+    }
+    return []; // no restriction
+  }, [currentUser]);
+
+  const getAccessibleWarehouseIds = useCallback((): string[] => {
+    if (!currentUser) return [];
+    return currentUser.assignedWarehouseIds;
+  }, [currentUser]);
+
   // Sync session changes from other tabs
   useEffect(() => {
     const handler = () => {
@@ -114,7 +160,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ currentUser, login, logout, hasPermission, setActiveWarehouse }}
+      value={{
+        currentUser,
+        login,
+        logout,
+        hasPermission,
+        setActiveWarehouse,
+        setActiveCompany,
+        getAccessibleShopIds,
+        getAccessibleWarehouseIds,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -21,6 +21,8 @@ import ChartOfAccountsPage from "./pages/ChartOfAccountsPage";
 import ChequeBooksPage from "./pages/ChequeBooksPage";
 import ChequePrintPage from "./pages/ChequePrintPage";
 import ChequeTemplatesPage from "./pages/ChequeTemplatesPage";
+import CompaniesPage from "./pages/CompaniesPage";
+import CompanySelectPage from "./pages/CompanySelectPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
 import DepartmentsPage from "./pages/DepartmentsPage";
@@ -81,8 +83,8 @@ const loginRoute = createRoute({
         const session = JSON.parse(
           localStorage.getItem("bizpos_session") || "{}",
         );
-        if (session.isSuperUser && session.activeWarehouseId === null) {
-          throw redirect({ to: "/warehouse-select" });
+        if (session.isSuperUser && !session.activeCompanyId) {
+          throw redirect({ to: "/company-select" });
         }
       } catch (e) {
         // If redirect was thrown, rethrow it
@@ -107,6 +109,19 @@ const warehouseSelectRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/warehouse-select",
   component: WarehouseSelectPage,
+});
+const companySelectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/company-select",
+  beforeLoad: () => {
+    if (!isLoggedIn()) throw redirect({ to: "/" });
+  },
+  component: CompanySelectPage,
+});
+const companiesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/companies",
+  component: CompaniesPage,
 });
 
 const dashboardRoute = createRoute({
@@ -380,8 +395,10 @@ const chequePrintRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  companySelectRoute,
   layoutRoute.addChildren([
     warehouseSelectRoute,
+    companiesRoute,
     dashboardRoute,
     posRoute,
     salesListRoute,

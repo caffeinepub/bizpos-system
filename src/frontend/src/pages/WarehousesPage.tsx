@@ -54,6 +54,15 @@ export default function WarehousesPage() {
   const { warehouses, shops, addWarehouse, updateWarehouse, deleteWarehouse } =
     useStore();
   const navigate = useNavigate();
+
+  const companies: { id: string; name: string }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_companies") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(
@@ -65,17 +74,23 @@ export default function WarehousesPage() {
   const [form, setForm] = useState({
     name: "",
     location: "",
+    companyId: "",
     status: "Active" as "Active" | "Inactive",
   });
 
   const openAdd = () => {
     setEditingWarehouse(null);
-    setForm({ name: "", location: "", status: "Active" });
+    setForm({ name: "", location: "", companyId: "", status: "Active" });
     setDialogOpen(true);
   };
   const openEdit = (w: Warehouse) => {
     setEditingWarehouse(w);
-    setForm({ name: w.name, location: w.location, status: w.status });
+    setForm({
+      name: w.name,
+      location: w.location,
+      companyId: (w as unknown as { companyId?: string }).companyId ?? "",
+      status: w.status,
+    });
     setDialogOpen(true);
   };
 
@@ -136,6 +151,7 @@ export default function WarehousesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Company</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Shops</TableHead>
@@ -153,6 +169,13 @@ export default function WarehousesPage() {
                           <Building2 className="h-4 w-4 text-gray-400" />
                           {w.name}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-gray-600 text-sm">
+                        {companies.find(
+                          (c) =>
+                            c.id ===
+                            (w as unknown as { companyId?: string }).companyId,
+                        )?.name || <span className="text-gray-400">—</span>}
                       </TableCell>
                       <TableCell className="text-gray-600">
                         {w.location}
@@ -310,6 +333,23 @@ export default function WarehousesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Company</Label>
+              <select
+                value={form.companyId}
+                onChange={(e) =>
+                  setForm({ ...form, companyId: e.target.value })
+                }
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              >
+                <option value="">No Company</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-1.5">
               <Label>Name *</Label>
               <Input

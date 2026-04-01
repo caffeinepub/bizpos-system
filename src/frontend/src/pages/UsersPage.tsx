@@ -55,12 +55,31 @@ export default function UsersPage() {
     roleId: "",
     status: "Active" as "Active" | "Inactive",
     isSuperUser: false,
+    assignedCompanyId: "",
     assignedWarehouseIds: [] as string[],
+    assignedShopIds: [] as string[],
   });
 
-  const warehouses: { id: string; name: string }[] = (() => {
+  const warehouses: { id: string; name: string; companyId?: string }[] =
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+
+  const companies: { id: string; name: string }[] = (() => {
     try {
-      return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+      return JSON.parse(localStorage.getItem("bizpos_companies") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  const allShops: { id: string; name: string; warehouseId: string }[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("bizpos_shops") || "[]");
     } catch {
       return [];
     }
@@ -81,7 +100,9 @@ export default function UsersPage() {
       roleId: roles[0]?.id || "",
       status: "Active",
       isSuperUser: false,
+      assignedCompanyId: "",
       assignedWarehouseIds: [],
+      assignedShopIds: [],
     });
     setDialogOpen(true);
   };
@@ -95,7 +116,13 @@ export default function UsersPage() {
       roleId: user.roleId,
       status: user.status,
       isSuperUser: user.isSuperUser === true,
+      assignedCompanyId:
+        (user as unknown as { assignedCompanyId?: string }).assignedCompanyId ??
+        "",
       assignedWarehouseIds: user.assignedWarehouseIds ?? [],
+      assignedShopIds:
+        (user as unknown as { assignedShopIds?: string[] }).assignedShopIds ??
+        [],
     });
     setDialogOpen(true);
   };
@@ -106,6 +133,15 @@ export default function UsersPage() {
       assignedWarehouseIds: prev.assignedWarehouseIds.includes(id)
         ? prev.assignedWarehouseIds.filter((w) => w !== id)
         : [...prev.assignedWarehouseIds, id],
+    }));
+  };
+
+  const toggleShop = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      assignedShopIds: prev.assignedShopIds.includes(id)
+        ? prev.assignedShopIds.filter((s) => s !== id)
+        : [...prev.assignedShopIds, id],
     }));
   };
 
@@ -125,7 +161,11 @@ export default function UsersPage() {
         roleId: form.roleId,
         status: form.status,
         isSuperUser: form.isSuperUser,
-        assignedWarehouseIds: form.isSuperUser ? form.assignedWarehouseIds : [],
+        assignedCompanyId: form.isSuperUser
+          ? undefined
+          : form.assignedCompanyId || undefined,
+        assignedWarehouseIds: form.assignedWarehouseIds,
+        assignedShopIds: form.isSuperUser ? [] : form.assignedShopIds,
       };
       if (form.password) update.password = form.password;
       updateUser(editingUser.id, update);
@@ -138,7 +178,11 @@ export default function UsersPage() {
         roleId: form.roleId,
         status: form.status,
         isSuperUser: form.isSuperUser,
-        assignedWarehouseIds: form.isSuperUser ? form.assignedWarehouseIds : [],
+        assignedCompanyId: form.isSuperUser
+          ? undefined
+          : form.assignedCompanyId || undefined,
+        assignedWarehouseIds: form.assignedWarehouseIds,
+        assignedShopIds: form.isSuperUser ? [] : form.assignedShopIds,
       });
       toast.success("User created successfully");
     }
@@ -238,6 +282,7 @@ export default function UsersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Company</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Super User</TableHead>
                 <TableHead>Status</TableHead>
@@ -249,7 +294,7 @@ export default function UsersPage() {
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center text-muted-foreground py-8"
                     data-ocid="users.empty_state"
                   >
@@ -261,6 +306,20 @@ export default function UsersPage() {
                   <TableRow key={user.id} data-ocid={`users.item.${i + 1}`}>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {user.isSuperUser ? (
+                        <span className="text-purple-600 text-xs font-medium">
+                          All Companies
+                        </span>
+                      ) : (
+                        companies.find(
+                          (c) =>
+                            c.id ===
+                            (user as unknown as { assignedCompanyId?: string })
+                              .assignedCompanyId,
+                        )?.name || <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         {getRoleName(user.roleId)}
@@ -425,45 +484,131 @@ export default function UsersPage() {
               />
             </div>
 
-            {/* Warehouse Assignment (shown only when Super User is ON) */}
+            {/* Company Assignment (shown only when not Super User) */}
+            {!form.isSuperUser && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Company *</Label>
+                <select
+                  value={form.assignedCompanyId}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      assignedCompanyId: e.target.value,
+                      assignedWarehouseIds: [],
+                      assignedShopIds: [],
+                    })
+                  }
+                  className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                  data-ocid="users.select"
+                >
+                  <option value="">Select Company</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Warehouse Assignment */}
+            {!form.isSuperUser && form.assignedCompanyId && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Assigned Warehouses
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Leave all unchecked for access to all company warehouses
+                </p>
+                <div className="border rounded-lg divide-y max-h-36 overflow-y-auto">
+                  {warehouses
+                    .filter(
+                      (w) =>
+                        !w.companyId || w.companyId === form.assignedCompanyId,
+                    )
+                    .map((wh) => (
+                      <div
+                        key={wh.id}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
+                        <Checkbox
+                          id={`wh-${wh.id}`}
+                          checked={form.assignedWarehouseIds.includes(wh.id)}
+                          onCheckedChange={() => toggleWarehouse(wh.id)}
+                          data-ocid="users.checkbox"
+                        />
+                        <label
+                          htmlFor={`wh-${wh.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {wh.name}
+                        </label>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Shop Assignment */}
+            {!form.isSuperUser && form.assignedCompanyId && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Assigned Shops</Label>
+                <p className="text-xs text-gray-500">
+                  Leave all unchecked for access to all warehouses&apos; shops
+                </p>
+                <div className="border rounded-lg divide-y max-h-36 overflow-y-auto">
+                  {allShops
+                    .filter((s) => {
+                      const wh = warehouses.find((w) => w.id === s.warehouseId);
+                      return (
+                        !wh?.companyId ||
+                        wh.companyId === form.assignedCompanyId
+                      );
+                    })
+                    .map((shop) => (
+                      <div
+                        key={shop.id}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
+                        <Checkbox
+                          id={`shop-${shop.id}`}
+                          checked={form.assignedShopIds.includes(shop.id)}
+                          onCheckedChange={() => toggleShop(shop.id)}
+                          data-ocid="users.checkbox"
+                        />
+                        <label
+                          htmlFor={`shop-${shop.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {shop.name}
+                        </label>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Warehouse Assignment for Super Users */}
             {form.isSuperUser && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Warehouse Access</Label>
                 <p className="text-xs text-gray-500">
-                  Select warehouses this super user can access (none selected =
-                  all warehouses)
+                  Select warehouses this super user can access (none = all)
                 </p>
-                <div className="border rounded-lg divide-y">
-                  <div className="flex items-center gap-3 px-3 py-2 bg-blue-50">
-                    <Checkbox
-                      id="wh-all"
-                      checked={form.assignedWarehouseIds.length === 0}
-                      onCheckedChange={(checked) => {
-                        if (checked)
-                          setForm({ ...form, assignedWarehouseIds: [] });
-                      }}
-                      data-ocid="users.checkbox"
-                    />
-                    <label
-                      htmlFor="wh-all"
-                      className="text-sm font-medium text-blue-700 cursor-pointer"
-                    >
-                      All Warehouses
-                    </label>
-                  </div>
+                <div className="border rounded-lg divide-y max-h-36 overflow-y-auto">
                   {warehouses.map((wh) => (
                     <div
                       key={wh.id}
                       className="flex items-center gap-3 px-3 py-2"
                     >
                       <Checkbox
-                        id={`wh-${wh.id}`}
+                        id={`wh-su-${wh.id}`}
                         checked={form.assignedWarehouseIds.includes(wh.id)}
                         onCheckedChange={() => toggleWarehouse(wh.id)}
                         data-ocid="users.checkbox"
                       />
                       <label
-                        htmlFor={`wh-${wh.id}`}
+                        htmlFor={`wh-su-${wh.id}`}
                         className="text-sm cursor-pointer"
                       >
                         {wh.name}

@@ -28,7 +28,18 @@ export default function LoginPage() {
     const ok = login(email.trim(), password);
     setLoading(false);
     if (ok) {
-      navigate({ to: "/dashboard" });
+      try {
+        const session = JSON.parse(
+          localStorage.getItem("bizpos_session") || "{}",
+        );
+        if (session.isSuperUser) {
+          navigate({ to: "/company-select" });
+        } else {
+          navigate({ to: "/dashboard" });
+        }
+      } catch {
+        navigate({ to: "/dashboard" });
+      }
     } else {
       setError("Invalid email or password. Please try again.");
     }
@@ -111,6 +122,7 @@ export default function LoginPage() {
             <p className="font-medium mb-1">Demo Credentials</p>
             <p>Admin: admin@bizpos.com / admin123</p>
             <p>Cashier: cashier@bizpos.com / cashier123</p>
+            <p>Super User: superuser@bizpos.com / super123</p>
           </div>
         </CardContent>
       </Card>
