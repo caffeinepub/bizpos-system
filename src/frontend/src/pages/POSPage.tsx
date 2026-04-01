@@ -56,9 +56,16 @@ export default function POSPage() {
     if (initialized.current) return;
     initialized.current = true;
     const userId = currentUser?.id ?? "";
-    const userShops = shops.filter(
-      (s) => s.status === "Active" && s.assignedUserIds.includes(userId),
-    );
+    const isAdmin =
+      currentUser?.isSuperUser ||
+      currentUser?.permissions?.includes("all") ||
+      currentUser?.roleName?.toLowerCase() === "admin";
+    // Admins/super users can access all active shops; regular users only their assigned shops
+    const userShops = isAdmin
+      ? shops.filter((s) => s.status === "Active")
+      : shops.filter(
+          (s) => s.status === "Active" && s.assignedUserIds.includes(userId),
+        );
     if (userShops.length === 1) {
       setSelectedShopId(userShops[0].id);
       setSelectedWarehouse(userShops[0].warehouseId);
@@ -70,19 +77,25 @@ export default function POSPage() {
   }, [currentUser, shops]);
 
   const accessibleShopIds = getAccessibleShopIds();
+  const isAdminUser =
+    currentUser?.isSuperUser ||
+    currentUser?.permissions?.includes("all") ||
+    currentUser?.roleName?.toLowerCase() === "admin";
   const userShops = currentUser
-    ? shops.filter((s) => {
-        const inAssigned =
-          s.status === "Active" && s.assignedUserIds.includes(currentUser.id);
-        const inAccessible =
-          accessibleShopIds.length === 0 || accessibleShopIds.includes(s.id);
-        return (
-          inAssigned ||
-          (accessibleShopIds.length > 0 &&
-            inAccessible &&
-            s.status === "Active")
-        );
-      })
+    ? isAdminUser
+      ? shops.filter((s) => s.status === "Active")
+      : shops.filter((s) => {
+          const inAssigned =
+            s.status === "Active" && s.assignedUserIds.includes(currentUser.id);
+          const inAccessible =
+            accessibleShopIds.length === 0 || accessibleShopIds.includes(s.id);
+          return (
+            inAssigned ||
+            (accessibleShopIds.length > 0 &&
+              inAccessible &&
+              s.status === "Active")
+          );
+        })
     : [];
 
   const selectedShop = shops.find((s) => s.id === selectedShopId);
