@@ -629,6 +629,10 @@ export default function ChartOfAccountsPage() {
 
   // ── Excel template download ──
   const downloadTemplate = () => {
+    if (!XLSX) {
+      toast.error("Spreadsheet library not loaded. Please refresh the page.");
+      return;
+    }
     const wb = XLSX.utils.book_new();
 
     // L0 Root Accounts sheet
@@ -720,6 +724,10 @@ export default function ChartOfAccountsPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
+      if (!XLSX) {
+        toast.error("Spreadsheet library not loaded. Please refresh the page.");
+        return;
+      }
       try {
         const wb = XLSX.read(ev.target?.result as ArrayBuffer, {
           type: "array",

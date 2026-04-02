@@ -10,32 +10,67 @@ import {
 } from "@/components/ui/table";
 import {
   AlertTriangle,
+  ClipboardList,
   DollarSign,
   Package,
   ShoppingBag,
   ShoppingCart,
   TrendingUp,
 } from "lucide-react";
+import { useMemo } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 
 export default function DashboardPage() {
-  const { sales, purchases, items, payments } = useStore();
+  const {
+    sales,
+    purchases,
+    items,
+    payments,
+    warehouses,
+    companies,
+    purchaseOrders,
+  } = useStore();
+  const { currentUser } = useAuth();
+
+  const companyWarehouseIds = useMemo(() => {
+    if (!currentUser?.activeCompanyId) return null;
+    return warehouses
+      .filter((w) => (w as any).companyId === currentUser.activeCompanyId)
+      .map((w) => w.id);
+  }, [warehouses, currentUser]);
+
+  const filteredSales = useMemo(
+    () =>
+      companyWarehouseIds
+        ? sales.filter((s) => companyWarehouseIds.includes(s.warehouseId))
+        : sales,
+    [sales, companyWarehouseIds],
+  );
+
+  const filteredPurchases = useMemo(
+    () =>
+      companyWarehouseIds
+        ? purchases.filter((p) => companyWarehouseIds.includes(p.warehouseId))
+        : purchases,
+    [purchases, companyWarehouseIds],
+  );
 
   const today = new Date().toISOString().slice(0, 10);
-  const todaySales = sales.filter((s) => s.saleDate === today);
-  const todayPurchases = purchases.filter((p) => p.purchaseDate === today);
+  const todaySales = filteredSales.filter((s) => s.saleDate === today);
+  const todayPurchases = filteredPurchases.filter(
+    (p) => p.purchaseDate === today,
+  );
 
   const totalSalesToday = todaySales.reduce((sum, s) => sum + s.total, 0);
   const totalPurchasesToday = todayPurchases.reduce(
@@ -44,22 +79,24 @@ export default function DashboardPage() {
   );
   const cashBalance = payments.reduce((sum, p) => sum + p.amount, 0);
   const lowStockItems = items.filter((i) => i.quantity < 10);
+  const pendingPOs = purchaseOrders.filter(
+    (po) => po.status === "Draft" || po.status === "Sent",
+  ).length;
 
-  const recentSales = [...sales]
+  const recentSales = [...filteredSales]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 5);
 
-  // Build weekly chart data
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const chartData = days.map((day, i) => {
     const saleAmt =
-      sales.length > 0
-        ? (sales.reduce((sum, s) => sum + s.total, 0) / 7) *
+      filteredSales.length > 0
+        ? (filteredSales.reduce((sum, s) => sum + s.total, 0) / 7) *
           (0.8 + 0.4 * Math.sin(i))
         : 0;
     const purAmt =
-      purchases.length > 0
-        ? (purchases.reduce((sum, p) => sum + p.total, 0) / 7) *
+      filteredPurchases.length > 0
+        ? (filteredPurchases.reduce((sum, p) => sum + p.total, 0) / 7) *
           (0.7 + 0.3 * Math.cos(i))
         : 0;
     return {
@@ -69,16 +106,25 @@ export default function DashboardPage() {
     };
   });
 
+  const activeCompany = currentUser?.activeCompanyId
+    ? companies.find((c) => c.id === currentUser.activeCompanyId)
+    : null;
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        {activeCompany && (
+          <p className="text-blue-600 text-sm font-medium">
+            {activeCompany.name}
+          </p>
+        )}
         <p className="text-gray-600 mt-1">
           Welcome back! Here's your business overview.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
@@ -92,7 +138,7 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-green-600 mt-1 flex items-center">
               <TrendingUp className="h-3 w-3 mr-1" />
-              {todaySales.length} transactions today
+              {todaySales.length} transactions
             </p>
           </CardContent>
         </Card>
@@ -109,7 +155,7 @@ export default function DashboardPage() {
               {totalPurchasesToday.toLocaleString()}
             </div>
             <p className="text-xs text-orange-600 mt-1">
-              {todayPurchases.length} purchase orders
+              {todayPurchases.length} orders
             </p>
           </CardContent>
         </Card>
@@ -144,6 +190,34 @@ export default function DashboardPage() {
               {lowStockItems.length}
             </div>
             <p className="text-xs text-orange-600 mt-1">Requires attention</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Pending POs
+            </CardTitle>
+            <ClipboardList className="h-5 w-5 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{pendingPOs}</div>
+            <p className="text-xs text-blue-600 mt-1">Awaiting approval</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total Items
+            </CardTitle>
+            <Package className="h-5 w-5 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">
+              {items.length}
+            </div>
+            <p className="text-xs text-purple-600 mt-1">In inventory</p>
           </CardContent>
         </Card>
       </div>

@@ -4142,6 +4142,19 @@ export function useStore() {
   // ---- Sales ----
   const addSale = useCallback(
     (sale: Sale) => {
+      // Deduct stock for each item sold
+      const currentItems = load<Item[]>(KEYS.items, []);
+      const updatedItems = currentItems.map((item) => {
+        const soldItem = sale.items.find((si) => si.itemId === item.id);
+        if (soldItem) {
+          return {
+            ...item,
+            quantity: Math.max(0, item.quantity - soldItem.quantity),
+          };
+        }
+        return item;
+      });
+      save(KEYS.items, updatedItems);
       save(KEYS.sales, [...load<Sale[]>(KEYS.sales, []), sale]);
       _log("Sales", "create", `Created sale ${sale.id}`);
     },
@@ -4169,6 +4182,22 @@ export function useStore() {
   // ---- Purchases ----
   const addPurchase = useCallback(
     (purchase: Purchase) => {
+      if (purchase.status === "Received") {
+        const currentItems = load<Item[]>(KEYS.items, []);
+        const updatedItems = currentItems.map((item) => {
+          const purchasedItem = purchase.items.find(
+            (pi) => pi.itemId === item.id,
+          );
+          if (purchasedItem) {
+            return {
+              ...item,
+              quantity: item.quantity + purchasedItem.quantity,
+            };
+          }
+          return item;
+        });
+        save(KEYS.items, updatedItems);
+      }
       save(KEYS.purchases, [...load<Purchase[]>(KEYS.purchases, []), purchase]);
       _log("Purchases", "create", `Created purchase ${purchase.id}`);
     },

@@ -15,7 +15,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, Search, ShoppingCart, Store, Trash2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertCircle,
+  Printer,
+  Search,
+  ShoppingCart,
+  Store,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -27,6 +42,21 @@ interface CartItem {
   price: number;
   quantity: number;
   subtotal: number;
+}
+
+interface LastSale {
+  id: string;
+  items: CartItem[];
+  subtotal: number;
+  discountAmt: number;
+  promoSavings: number;
+  taxAmount: number;
+  total: number;
+  paymentMethod: string;
+  customerName: string;
+  shopName: string;
+  cashierName: string;
+  date: string;
 }
 
 export default function POSPage() {
@@ -44,12 +74,15 @@ export default function POSPage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState("0");
   const [selectedShopId, setSelectedShopId] = useState("");
   const [shopDialogOpen, setShopDialogOpen] = useState(false);
   const [noShopWarning, setNoShopWarning] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [lastSale, setLastSale] = useState<LastSale | null>(null);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -60,7 +93,6 @@ export default function POSPage() {
       currentUser?.isSuperUser ||
       currentUser?.permissions?.includes("all") ||
       currentUser?.roleName?.toLowerCase() === "admin";
-    // Admins/super users can access all active shops; regular users only their assigned shops
     const userShops = isAdmin
       ? shops.filter((s) => s.status === "Active")
       : shops.filter(
@@ -165,7 +197,6 @@ export default function POSPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Calculate promo savings per cart item
   const promoSavings = cart.reduce((total, cartItem) => {
     const storeItem = items.find((i) => i.id === cartItem.itemId);
     const category = storeItem?.category ?? "";
@@ -184,7 +215,6 @@ export default function POSPage() {
     return total + (cartItem.subtotal * bestPromo) / 100;
   }, 0);
 
-  // Calculate tax per cart item
   const taxAmount = cart.reduce((total, cartItem) => {
     const storeItem = items.find((i) => i.id === cartItem.itemId);
     const category = storeItem?.category ?? "";
@@ -205,6 +235,14 @@ export default function POSPage() {
 
   const taxableAmount = Math.max(0, subtotal - discountAmt - promoSavings);
   const total = Math.max(0, taxableAmount + taxAmount);
+
+  const handleNewSale = () => {
+    setReceiptOpen(false);
+    setLastSale(null);
+    setCart([]);
+    setDiscount("0");
+    setSelectedCustomer("");
+  };
 
   const handleCompleteSale = () => {
     if (cart.length === 0) {
@@ -245,12 +283,25 @@ export default function POSPage() {
       paidAmount,
       balanceDue: total - paidAmount,
       status: saleType === "Cash" ? "Completed" : "Pending",
-      saleDate: new Date().toISOString().slice(0, 10),
+      saleDate: today,
       createdAt: new Date().toISOString(),
     });
     toast.success(`Sale ${saleId} completed!`);
-    setCart([]);
-    setDiscount("0");
+    setLastSale({
+      id: saleId,
+      items: [...cart],
+      subtotal,
+      discountAmt,
+      promoSavings,
+      taxAmount,
+      total,
+      paymentMethod,
+      customerName: customer?.name || "Walk-in Customer",
+      shopName: selectedShop?.name || "",
+      cashierName: currentUser?.name || "Cashier",
+      date: today,
+    });
+    setReceiptOpen(true);
   };
 
   if (noShopWarning) {
@@ -278,6 +329,7 @@ export default function POSPage() {
 
   return (
     <div className="p-6 space-y-4">
+      {/* Shop selector dialog */}
       <Dialog open={shopDialogOpen} onOpenChange={setShopDialogOpen}>
         <DialogContent data-ocid="pos.dialog">
           <DialogHeader>
@@ -299,6 +351,122 @@ export default function POSPage() {
               </button>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Modal */}
+      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
+        <DialogContent className="max-w-lg print:block" data-ocid="pos.modal">
+          <DialogHeader>
+            <DialogTitle>Sale Completed — Receipt</DialogTitle>
+          </DialogHeader>
+          {lastSale && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-500">Sale ID:</span>{" "}
+                  <span className="font-semibold">{lastSale.id}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Date:</span>{" "}
+                  <span className="font-semibold">{lastSale.date}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Cashier:</span>{" "}
+                  <span className="font-semibold">{lastSale.cashierName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Shop:</span>{" "}
+                  <span className="font-semibold">{lastSale.shopName}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-gray-500">Customer:</span>{" "}
+                  <span className="font-semibold">{lastSale.customerName}</span>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Unit Price</TableHead>
+                    <TableHead className="text-right">Subtotal</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lastSale.items.map((item) => (
+                    <TableRow key={item.itemId}>
+                      <TableCell className="text-sm">{item.itemName}</TableCell>
+                      <TableCell className="text-right text-sm">
+                        {item.quantity}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {item.price.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {item.subtotal.toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <div className="border-t pt-3 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span>{lastSale.subtotal.toLocaleString()}</span>
+                </div>
+                {lastSale.discountAmt > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Discount</span>
+                    <span>-{lastSale.discountAmt.toLocaleString()}</span>
+                  </div>
+                )}
+                {lastSale.promoSavings > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Promo Savings</span>
+                    <span>-{lastSale.promoSavings.toFixed(2)}</span>
+                  </div>
+                )}
+                {lastSale.taxAmount > 0 && (
+                  <div className="flex justify-between text-orange-600">
+                    <span>Tax</span>
+                    <span>+{lastSale.taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t pt-2">
+                  <span>Total</span>
+                  <span className="text-primary">
+                    {lastSale.total.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Payment Method</span>
+                  <span className="font-medium">{lastSale.paymentMethod}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => window.print()}
+                  className="flex-1"
+                  data-ocid="pos.secondary_button"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Receipt
+                </Button>
+                <Button
+                  onClick={handleNewSale}
+                  className="flex-1"
+                  data-ocid="pos.primary_button"
+                >
+                  New Sale
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -492,6 +660,26 @@ export default function POSPage() {
                     min="0"
                     data-ocid="pos.input"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-gray-600">
+                    Payment Method
+                  </Label>
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={setPaymentMethod}
+                  >
+                    <SelectTrigger className="h-8" data-ocid="pos.select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                      <SelectItem value="Bank Transfer">
+                        Bank Transfer
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 {promoSavings > 0 && (
                   <div className="flex justify-between text-sm text-green-700">

@@ -26,6 +26,21 @@ export default function SettingsPage() {
     toast.success("Settings saved successfully");
   };
 
+  const handleReset = () => {
+    if (
+      !window.confirm(
+        "This will delete ALL data and reload with fresh seed data. Are you sure?",
+      )
+    )
+      return;
+    for (const k of Object.keys(localStorage).filter((k) =>
+      k.startsWith("bizpos_"),
+    )) {
+      localStorage.removeItem(k);
+    }
+    window.location.reload();
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -128,6 +143,24 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-red-600">Developer Tools</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-4">
+            Clear all stored data and reload with fresh seed data. Use this to
+            reset the system to its initial state.
+          </p>
+          <Button
+            variant="destructive"
+            onClick={handleReset}
+            data-ocid="settings.delete_button"
+          >
+            Reset All Data
+          </Button>
         </CardContent>
       </Card>
     </div>
