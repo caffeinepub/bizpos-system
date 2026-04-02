@@ -98,9 +98,19 @@ export default function POSPage() {
       : shops.filter(
           (s) => s.status === "Active" && s.assignedUserIds.includes(userId),
         );
-    if (userShops.length === 1) {
+    // Try to restore last selected shop from localStorage
+    const lastShopKey = `bizpos_pos_last_shop_${userId}`;
+    const savedShopId = localStorage.getItem(lastShopKey);
+    const savedShop = savedShopId
+      ? userShops.find((s) => s.id === savedShopId)
+      : null;
+    if (savedShop) {
+      setSelectedShopId(savedShop.id);
+      setSelectedWarehouse(savedShop.warehouseId);
+    } else if (userShops.length === 1) {
       setSelectedShopId(userShops[0].id);
       setSelectedWarehouse(userShops[0].warehouseId);
+      localStorage.setItem(lastShopKey, userShops[0].id);
     } else if (userShops.length > 1) {
       setShopDialogOpen(true);
     } else if (userShops.length === 0 && shops.length > 0) {
@@ -138,6 +148,9 @@ export default function POSPage() {
       setSelectedShopId(shopId);
       setSelectedWarehouse(shop.warehouseId);
       setShopDialogOpen(false);
+      // Remember choice so POS doesn't ask again next time
+      const userId = currentUser?.id ?? "";
+      localStorage.setItem(`bizpos_pos_last_shop_${userId}`, shopId);
     }
   };
 
