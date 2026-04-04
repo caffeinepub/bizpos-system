@@ -512,6 +512,38 @@ import WarehousesPage from "./pages/WarehousesPage";
   localStorage.setItem("bizpos_seeded_v10", "1");
 })();
 
+// Fix: ensure "banking" permission is in all admin sessions
+(() => {
+  try {
+    const session = JSON.parse(
+      localStorage.getItem("bizpos_session") || "null",
+    );
+    if (
+      session &&
+      Array.isArray(session.permissions) &&
+      !session.permissions.includes("banking")
+    ) {
+      if (
+        session.permissions.includes("all") ||
+        session.permissions.includes("banks") ||
+        session.permissions.includes("reports")
+      ) {
+        const updated = {
+          ...session,
+          permissions: [
+            ...session.permissions.filter((p: string) => p !== "banks"),
+            "banking",
+            "banks",
+          ],
+        };
+        localStorage.setItem("bizpos_session", JSON.stringify(updated));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+})();
+
 function isLoggedIn() {
   return !!localStorage.getItem("bizpos_session");
 }

@@ -118,6 +118,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     group: "Banking",
     permissions: [
+      { key: "banking", label: "Banking Access" },
       { key: "banks", label: "Banks" },
       { key: "bank_branches", label: "Bank Branches" },
       { key: "bank_accounts", label: "Bank Accounts" },

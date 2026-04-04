@@ -263,7 +263,7 @@ const navGroups: NavGroup[] = [
     key: "banking",
     label: "Banking",
     icon: Landmark,
-    module: "banks",
+    module: "banking",
     subItems: [
       { path: "/banks", label: "Banks", icon: Building2 },
       { path: "/bank-branches", label: "Branches", icon: MapPin },
