@@ -43,6 +43,8 @@ import type { AllowanceType } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 type FormState = Omit<AllowanceType, "id">;
 
 const EMPTY_FORM: FormState = {
@@ -157,7 +159,12 @@ export default function AllowanceTypesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Allowance Types</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Allowance Types
+            </h1>
+            <PageHelp pageId="allowance-types" />
+          </div>
           <p className="text-gray-600 mt-1">Manage employee allowance types</p>
         </div>
         <Button onClick={openAdd} data-ocid="allowance_types.open_modal_button">

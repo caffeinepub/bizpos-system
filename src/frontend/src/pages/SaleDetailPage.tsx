@@ -15,6 +15,8 @@ import { ArrowLeft, Printer } from "lucide-react";
 import AttachmentManager from "../components/AttachmentManager";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-green-100 text-green-800",
   Pending: "bg-yellow-100 text-yellow-800",

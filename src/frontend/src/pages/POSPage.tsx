@@ -42,6 +42,8 @@ import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 import type { Item } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 interface CartItem {
   itemId: string;
   itemName: string;
@@ -782,7 +784,10 @@ export default function POSPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Point of Sale</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">Point of Sale</h1>
+            <PageHelp pageId="pos" />
+          </div>
           {selectedShop && (
             <p className="text-gray-500 mt-0.5 flex items-center gap-1.5 text-sm">
               <Store className="h-4 w-4" />

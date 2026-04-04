@@ -47,6 +47,8 @@ import AttachmentManager from "../components/AttachmentManager";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 type TicketType = "IT Helpdesk" | "Customer Support";
 type TicketPriority = "Low" | "Medium" | "High" | "Critical";
 type TicketStatus = "Open" | "Assigned" | "In Progress" | "Resolved" | "Closed";
@@ -445,7 +447,10 @@ export default function TicketsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tickets</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Tickets</h1>
+            <PageHelp pageId="tickets" />
+          </div>
           <p className="text-gray-600 mt-1">
             IT Helpdesk & Customer Support tickets
           </p>

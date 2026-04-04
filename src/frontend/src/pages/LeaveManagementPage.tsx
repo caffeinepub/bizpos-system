@@ -51,6 +51,8 @@ import AttachmentManager from "../components/AttachmentManager";
 import type { LeaveRequest, LeaveType } from "../store/useStore";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 const STATUS_COLORS: Record<LeaveRequest["status"], string> = {
   Pending: "bg-yellow-100 text-yellow-700",
   Approved: "bg-green-100 text-green-700",
@@ -285,7 +287,12 @@ export default function LeaveManagementPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Leave Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Leave Management
+            </h1>
+            <PageHelp pageId="leave-management" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage employee leave requests and balances
           </p>

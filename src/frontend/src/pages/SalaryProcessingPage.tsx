@@ -39,6 +39,8 @@ import type { Payroll, PayrollItem } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const MONTHS = [
   "January",
   "February",
@@ -303,7 +305,12 @@ export default function SalaryProcessingPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Salary Processing</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Salary Processing
+          </h1>
+          <PageHelp pageId="salary-processing" />
+        </div>
         <p className="text-gray-600 mt-1">
           Process payroll and manage salary records
         </p>

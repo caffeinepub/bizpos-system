@@ -30,6 +30,8 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 type AttendanceStatus = "present" | "absent" | "half-day" | "not-marked";
 
 interface AttendanceRecord {
@@ -314,7 +316,10 @@ export default function AttendancePage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Attendance</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">Attendance</h1>
+          <PageHelp pageId="attendance" />
+        </div>
         <p className="text-gray-600 mt-1">Track daily employee attendance</p>
       </div>
 

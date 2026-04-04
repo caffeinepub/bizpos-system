@@ -1,3 +1,4 @@
+import PageHelp from "@/components/PageHelp";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+
 import {
   exportExcel as utilExportExcel,
   exportPDF as utilExportPDF,
@@ -199,7 +201,10 @@ export default function BanksPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Banks</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-800">Banks</h1>
+          <PageHelp pageId="banks" />
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={doExportExcel}>
             <FileSpreadsheet className="w-4 h-4 mr-1" />

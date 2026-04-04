@@ -20,6 +20,8 @@ import { Package, Search } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function WarehouseStockPage() {
   const { items, warehouses } = useStore();
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
@@ -43,7 +45,10 @@ export default function WarehouseStockPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Warehouse Stock</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">Warehouse Stock</h1>
+          <PageHelp pageId="warehouse-stock" />
+        </div>
         <p className="text-gray-600 mt-1">
           View stock levels across warehouses
         </p>

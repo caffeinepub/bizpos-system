@@ -15,6 +15,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 const CURRENCIES = ["PKR", "USD", "EUR", "GBP", "SAR", "AED", "INR"];
 
 export default function SettingsPage() {
@@ -87,7 +89,10 @@ export default function SettingsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+            <PageHelp pageId="settings" />
+          </div>
           <p className="text-gray-600 mt-1">Configure system preferences</p>
         </div>
         <Button onClick={handleSave} data-ocid="settings.save_button">

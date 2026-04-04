@@ -27,6 +27,8 @@ import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 function fmt(n: number) {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2 });
 }
@@ -275,9 +277,12 @@ export default function BankReconciliationPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          Bank Reconciliation
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Bank Reconciliation
+          </h1>
+          <PageHelp pageId="bank-reconciliation" />
+        </div>
         <p className="text-gray-600 mt-1">
           Match bank transactions with journal entries
         </p>

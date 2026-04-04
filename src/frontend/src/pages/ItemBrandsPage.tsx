@@ -42,6 +42,8 @@ import type { ItemBrand } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function ItemBrandsPage() {
   const { itemBrands, items, addItemBrand, updateItemBrand, deleteItemBrand } =
     useStore();

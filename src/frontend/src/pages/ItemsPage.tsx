@@ -44,6 +44,8 @@ import type { Item, ItemVariant } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 // Simple visual barcode renderer using canvas
 function BarcodeCanvas({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -519,7 +521,10 @@ export default function ItemsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Items</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Items</h1>
+            <PageHelp pageId="items" />
+          </div>
           <p className="text-gray-600 mt-1">Manage inventory items</p>
         </div>
         <Button onClick={openAdd} data-ocid="items.open_modal_button">

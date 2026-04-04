@@ -43,6 +43,8 @@ import type { Designation } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 type FormState = Omit<Designation, "id">;
 
 const EMPTY_FORM: FormState = {
@@ -175,7 +177,10 @@ export default function DesignationsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Designations</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Designations</h1>
+            <PageHelp pageId="designations" />
+          </div>
           <p className="text-gray-600 mt-1">Manage employee designations</p>
         </div>
         <Button onClick={openAdd} data-ocid="designations.open_modal_button">

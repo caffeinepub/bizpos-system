@@ -25,6 +25,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 interface BankAccount {
   id: string;
   accountNumber: string;
@@ -736,7 +738,10 @@ export default function ChequePrintPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Cheque Print</h1>
+      <div className="flex items-center gap-2 mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Cheque Print</h1>
+        <PageHelp pageId="cheque-print" />
+      </div>
       <Tabs defaultValue="print">
         <TabsList className="mb-4">
           <TabsTrigger value="print">

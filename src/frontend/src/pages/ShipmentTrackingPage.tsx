@@ -22,6 +22,8 @@ import { useState } from "react";
 import { type Shipment, type ShipmentItem, useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-gray-100 text-gray-700",
   Shipped: "bg-blue-100 text-blue-700",

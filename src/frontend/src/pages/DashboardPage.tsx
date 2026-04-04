@@ -33,6 +33,8 @@ import { useAuth } from "../context/AuthContext";
 import { formatCurrency, getPrefs } from "../lib/prefs";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function DashboardPage() {
   const {
     sales,
@@ -189,7 +191,10 @@ export default function DashboardPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <PageHelp pageId="dashboard" />
+        </div>
         {activeCompany && (
           <p className="text-blue-600 text-sm font-medium">
             {activeCompany.name}

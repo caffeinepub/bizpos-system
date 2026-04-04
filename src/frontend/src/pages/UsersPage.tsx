@@ -42,6 +42,8 @@ import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 import type { User } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function UsersPage() {
   const { users, roles, addUser, updateUser, deleteUser, addLog } = useStore();
   const [search, setSearch] = useState("");
@@ -202,7 +204,12 @@ export default function UsersPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              User Management
+            </h1>
+            <PageHelp pageId="users" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage system users and their access
           </p>

@@ -45,6 +45,8 @@ import type { EmployeeShiftAssignment, Shift } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type ShiftForm = Omit<Shift, "id">;
@@ -181,7 +183,12 @@ export default function ShiftsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Shift Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Shift Management
+            </h1>
+            <PageHelp pageId="shifts" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage shifts and employee assignments
           </p>

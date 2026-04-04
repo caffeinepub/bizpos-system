@@ -54,6 +54,8 @@ import type { Employee } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const DEPARTMENTS = [
   "Sales",
   "IT",
@@ -267,7 +269,10 @@ export default function EmployeesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Employees</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Employees</h1>
+            <PageHelp pageId="employees" />
+          </div>
           <p className="text-gray-600 mt-1">Manage all employee records</p>
         </div>
         <div className="flex gap-2">

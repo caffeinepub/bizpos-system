@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import type { Account, AccountMapping } from "../store/useStore";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 interface MappingField {
   key: keyof AccountMapping;
   label: string;
@@ -145,10 +147,13 @@ export default function AccountMappingPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Link2 className="h-7 w-7 text-blue-600" />
-            Account Mapping
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Link2 className="h-7 w-7 text-blue-600" />
+              Account Mapping
+            </h1>
+            <PageHelp pageId="account-mapping" />
+          </div>
           <p className="text-gray-500 mt-1 text-sm">
             Map each financial transaction type to the correct Chart of Accounts
             entry. These mappings drive automatic journal entry generation

@@ -16,6 +16,8 @@ import type { Account } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 function fmt(n: number) {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2 });
 }
@@ -231,7 +233,10 @@ export default function BalanceSheetPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Balance Sheet</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Balance Sheet</h1>
+            <PageHelp pageId="balance-sheet" />
+          </div>
           <p className="text-gray-600 mt-1">
             Assets = Liabilities + Equity — computed from journal entries
           </p>

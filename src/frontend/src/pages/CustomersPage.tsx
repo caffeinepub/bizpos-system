@@ -51,6 +51,8 @@ import { useStore } from "../store/useStore";
 import type { Customer } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 interface CustomerGroup {
   id: string;
   name: string;
@@ -265,7 +267,10 @@ export default function CustomersPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+            <PageHelp pageId="customers" />
+          </div>
           <p className="text-gray-600 mt-1">Manage your customer contacts</p>
         </div>
         <div className="flex gap-2">

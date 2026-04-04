@@ -49,6 +49,8 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
+import PageHelp from "@/components/PageHelp";
+
 interface Company {
   id: string;
   name: string;
@@ -169,7 +171,10 @@ export default function CompaniesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Companies</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Companies</h1>
+            <PageHelp pageId="companies" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage all companies in the system
           </p>

@@ -5,6 +5,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { Building2, LogOut, Mail, MapPin, Phone } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
+import PageHelp from "@/components/PageHelp";
+
 interface Company {
   id: string;
   name: string;

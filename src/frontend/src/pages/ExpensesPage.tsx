@@ -40,6 +40,8 @@ import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 import type { Expense } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 interface ExpenseCategory {
   id: string;
   name: string;
@@ -147,7 +149,10 @@ export default function ExpensesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
+            <PageHelp pageId="expenses" />
+          </div>
           <p className="text-gray-600 mt-1">Track business expenses</p>
         </div>
         <Button onClick={openAdd} data-ocid="expenses.open_modal_button">

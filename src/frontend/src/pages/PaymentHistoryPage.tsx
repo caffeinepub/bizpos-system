@@ -19,6 +19,8 @@ import { DollarSign, Receipt, Search } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function PaymentHistoryPage() {
   const { payments, paymentModes } = useStore();
   const [search, setSearch] = useState("");
@@ -41,7 +43,10 @@ export default function PaymentHistoryPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
+          <PageHelp pageId="payment-history" />
+        </div>
         <p className="text-gray-600 mt-1">All recorded payment transactions</p>
       </div>
 

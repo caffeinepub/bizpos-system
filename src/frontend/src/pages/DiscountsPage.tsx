@@ -1,3 +1,4 @@
+import PageHelp from "@/components/PageHelp";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +51,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 import type { Discount } from "../store/useStore";
+
 import {
   exportExcel as exportExcelUtil,
   exportPDF as exportPDFUtil,
@@ -175,7 +177,10 @@ export default function DiscountsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Discounts</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Discounts</h1>
+            <PageHelp pageId="discounts" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage product and category discounts
           </p>

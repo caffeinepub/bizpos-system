@@ -1,3 +1,4 @@
+import PageHelp from "@/components/PageHelp";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 import type { Promotion } from "../store/useStore";
+
 import {
   exportExcel as exportExcelUtil,
   exportPDF as exportPDFUtil,
@@ -235,7 +237,10 @@ export default function PromotionsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Promotions</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Promotions</h1>
+            <PageHelp pageId="promotions" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage date-range based promotional discounts
           </p>

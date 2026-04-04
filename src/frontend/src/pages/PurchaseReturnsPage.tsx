@@ -25,6 +25,8 @@ import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 import type { DebitNote } from "./DebitNotesPage";
 
+import PageHelp from "@/components/PageHelp";
+
 function loadDebitNotes(): DebitNote[] {
   try {
     return JSON.parse(localStorage.getItem("bizpos_debit_notes") || "[]");
@@ -124,7 +126,12 @@ export default function PurchaseReturnsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Returns</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Purchase Returns
+            </h1>
+            <PageHelp pageId="purchase-returns" />
+          </div>
           <p className="text-gray-600 mt-1">
             View all debit notes and purchase returns
           </p>

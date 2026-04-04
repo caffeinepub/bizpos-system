@@ -15,6 +15,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 interface OpeningBalance {
   entityId: string;
   entityType: "account" | "customer" | "supplier";
@@ -125,7 +127,12 @@ export default function OpeningBalancesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Opening Balances</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Opening Balances
+            </h1>
+            <PageHelp pageId="opening-balances" />
+          </div>
           <p className="text-gray-600 mt-1">
             Set opening balances before recording any transactions
           </p>

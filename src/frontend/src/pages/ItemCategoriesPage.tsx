@@ -51,6 +51,8 @@ import type { Account, ItemCategory } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function ItemCategoriesPage() {
   const {
     itemCategories,

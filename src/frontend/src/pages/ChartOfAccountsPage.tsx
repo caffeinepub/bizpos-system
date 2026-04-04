@@ -47,6 +47,8 @@ const XLSX = (window as any).XLSX;
 import type { Account } from "../store/useStore";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 type AccType = Account["type"];
 type ContextAction = "add" | "edit" | "delete" | "view";
@@ -845,7 +847,12 @@ export default function ChartOfAccountsPage() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Chart of Accounts</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Chart of Accounts
+          </h1>
+          <PageHelp pageId="chart-of-accounts" />
+        </div>
         <Button
           onClick={() => openAdd()}
           className="bg-blue-600 hover:bg-blue-700"

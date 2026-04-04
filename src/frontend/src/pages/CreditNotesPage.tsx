@@ -42,6 +42,8 @@ import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 export interface CreditNote {
   id: string;
   noteNumber: string;
@@ -371,7 +373,10 @@ export default function CreditNotesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Credit Notes</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Credit Notes</h1>
+            <PageHelp pageId="credit-notes" />
+          </div>
           <p className="text-gray-600 mt-1">
             Sales returns & credit notes — restocks inventory on posting
           </p>

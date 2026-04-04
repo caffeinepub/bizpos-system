@@ -33,6 +33,8 @@ import { toast } from "sonner";
 import type { Log } from "../store/useStore";
 import { useStore } from "../store/useStore";
 
+import PageHelp from "@/components/PageHelp";
+
 const ACTION_COLORS: Record<Log["action"], string> = {
   create: "bg-green-100 text-green-700",
   update: "bg-blue-100 text-blue-700",
@@ -144,7 +146,10 @@ export default function LogsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">System Logs</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">System Logs</h1>
+            <PageHelp pageId="logs" />
+          </div>
           <p className="text-gray-600 mt-1">
             Audit trail of all system activities
           </p>

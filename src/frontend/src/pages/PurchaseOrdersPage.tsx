@@ -59,6 +59,8 @@ import { useStore } from "../store/useStore";
 import type { PurchaseOrder } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const STATUS_COLORS: Record<string, string> = {
   Draft: "bg-gray-100 text-gray-700",
   Sent: "bg-blue-100 text-blue-700",
@@ -297,7 +299,12 @@ export default function PurchaseOrdersPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Orders</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Purchase Orders
+            </h1>
+            <PageHelp pageId="purchase-orders" />
+          </div>
           <p className="text-gray-600 mt-1">
             Create and manage purchase orders
           </p>

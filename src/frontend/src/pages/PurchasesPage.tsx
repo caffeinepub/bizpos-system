@@ -54,6 +54,8 @@ import { useStore } from "../store/useStore";
 import type { Purchase, PurchaseItem } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-yellow-100 text-yellow-800",
   Received: "bg-green-100 text-green-800",
@@ -298,7 +300,10 @@ export default function PurchasesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Purchases</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Purchases</h1>
+            <PageHelp pageId="purchases" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage purchase orders and supplier receipts
           </p>

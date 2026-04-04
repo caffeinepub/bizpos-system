@@ -13,6 +13,7 @@ import { AuthProvider } from "./context/AuthContext";
 import AccountMappingPage from "./pages/AccountMappingPage";
 import AllowanceTypesPage from "./pages/AllowanceTypesPage";
 import AttendancePage from "./pages/AttendancePage";
+import BackendManualPage from "./pages/BackendManualPage";
 import BalanceSheetPage from "./pages/BalanceSheetPage";
 import BankAccountsPage from "./pages/BankAccountsPage";
 import BankBranchesPage from "./pages/BankBranchesPage";
@@ -28,6 +29,7 @@ import CreditNotesPage from "./pages/CreditNotesPage";
 import CustomerGroupsPage from "./pages/CustomerGroupsPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
+import DatabaseManualPage from "./pages/DatabaseManualPage";
 import DebitNotesPage from "./pages/DebitNotesPage";
 import DepartmentsPage from "./pages/DepartmentsPage";
 import DesignationsPage from "./pages/DesignationsPage";
@@ -75,6 +77,7 @@ import SuppliersPage from "./pages/SuppliersPage";
 import TaxesPage from "./pages/TaxesPage";
 import TicketsPage from "./pages/TicketsPage";
 import TrialBalancePage from "./pages/TrialBalancePage";
+import UserManualPage from "./pages/UserManualPage";
 import UsersPage from "./pages/UsersPage";
 import WarehouseSelectPage from "./pages/WarehouseSelectPage";
 import WarehouseStockPage from "./pages/WarehouseStockPage";
@@ -1402,6 +1405,23 @@ const customerGroupsRoute = createRoute({
   component: CustomerGroupsPage,
 });
 
+const userManualRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/user-manual",
+  component: UserManualPage,
+});
+
+const databaseManualRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/database-manual",
+  component: DatabaseManualPage,
+});
+
+const backendManualRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/backend-manual",
+  component: BackendManualPage,
+});
 const routeTree = rootRoute.addChildren([
   loginRoute,
   companySelectRoute,
@@ -1474,6 +1494,9 @@ const routeTree = rootRoute.addChildren([
     salesReturnsRoute,
     purchaseReturnsRoute,
     customerGroupsRoute,
+    userManualRoute,
+    databaseManualRoute,
+    backendManualRoute,
   ]),
 ]);
 

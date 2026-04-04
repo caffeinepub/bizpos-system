@@ -41,6 +41,8 @@ import { useStore } from "../store/useStore";
 import type { JournalEntry, JournalLine } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 interface FormLine {
   _id: string;
   accountId: string;
@@ -224,7 +226,12 @@ export default function JournalEntriesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Journal Entries</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Journal Entries
+            </h1>
+            <PageHelp pageId="journal-entries" />
+          </div>
           <p className="text-gray-600 mt-1">Double-entry bookkeeping records</p>
         </div>
         <div className="flex gap-2">

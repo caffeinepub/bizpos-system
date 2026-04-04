@@ -25,6 +25,8 @@ import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 import type { CreditNote } from "./CreditNotesPage";
 
+import PageHelp from "@/components/PageHelp";
+
 function loadCreditNotes(): CreditNote[] {
   try {
     return JSON.parse(localStorage.getItem("bizpos_credit_notes") || "[]");
@@ -108,7 +110,10 @@ export default function SalesReturnsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sales Returns</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Sales Returns</h1>
+            <PageHelp pageId="sales-returns" />
+          </div>
           <p className="text-gray-600 mt-1">
             View all credit notes and sales returns
           </p>

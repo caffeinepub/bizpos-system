@@ -39,6 +39,8 @@ import { Edit, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import PageHelp from "@/components/PageHelp";
+
 export interface CustomerGroup {
   id: string;
   name: string;
@@ -176,7 +178,12 @@ export default function CustomerGroupsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customer Groups</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">
+              Customer Groups
+            </h1>
+            <PageHelp pageId="customer-groups" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage customer segments with pricing tiers
           </p>

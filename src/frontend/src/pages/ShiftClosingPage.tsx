@@ -41,6 +41,8 @@ import type { ShiftClosing } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 export default function ShiftClosingPage() {
   const {
     shops,
@@ -217,7 +219,10 @@ export default function ShiftClosingPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Shift Closing</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-900">Shift Closing</h1>
+          <PageHelp pageId="shift-closing" />
+        </div>
         <p className="text-gray-600 mt-1">
           Manage daily shift opening and closing
         </p>

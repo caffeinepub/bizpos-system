@@ -40,6 +40,8 @@ import type { SalarySlip } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel } from "../utils/exportUtils";
 
+import PageHelp from "@/components/PageHelp";
+
 const MONTHS = [
   "January",
   "February",
@@ -275,7 +277,10 @@ export default function SalarySlipsPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Salary Slips</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900">Salary Slips</h1>
+            <PageHelp pageId="salary-slips" />
+          </div>
           <p className="text-gray-600 mt-1">
             Manage and print employee salary slips
           </p>
