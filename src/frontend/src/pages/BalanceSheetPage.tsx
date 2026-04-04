@@ -12,30 +12,68 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useStore } from "../store/useStore";
 import type { Account } from "../store/useStore";
+import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
 function fmt(n: number) {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2 });
 }
 
-function groupAccounts(accounts: Account[], type: Account["type"]) {
-  return accounts.filter(
-    (a) => a.type === type && !a.isGroup && a.currentBalance !== 0,
-  );
-}
-
 export default function BalanceSheetPage() {
-  const { accounts } = useStore();
+  const { accounts, journalEntries } = useStore();
   const { currentUser } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const [asOf, setAsOf] = useState(today);
   const [generated, setGenerated] = useState(false);
 
-  const assets = groupAccounts(accounts, "Asset");
-  const liabilities = groupAccounts(accounts, "Liability");
-  const equity = groupAccounts(accounts, "Equity");
+  // Compute running balances from journal entries up to asOf date
+  const computeBalances = (): Record<string, number> => {
+    const balanceMap: Record<string, number> = {};
+    // Initialize with opening balances
+    for (const acc of accounts) {
+      if (!acc.isGroup) {
+        balanceMap[acc.id] = acc.openingBalance || 0;
+      }
+    }
+    for (const entry of journalEntries) {
+      if (entry.date.slice(0, 10) > asOf) continue;
+      for (const line of entry.lines) {
+        const acc = accounts.find((a) => a.id === line.accountId);
+        if (!acc) continue;
+        if (balanceMap[line.accountId] === undefined)
+          balanceMap[line.accountId] = acc.openingBalance || 0;
+        if (acc.normalBalance === "Debit") {
+          balanceMap[line.accountId] += line.debit - line.credit;
+        } else {
+          balanceMap[line.accountId] += line.credit - line.debit;
+        }
+      }
+    }
+    return balanceMap;
+  };
+
+  const getBalance = (
+    acc: Account,
+    balanceMap: Record<string, number>,
+  ): number => {
+    if (balanceMap[acc.id] !== undefined) return balanceMap[acc.id];
+    return acc.currentBalance;
+  };
+
+  const balanceMap = generated ? computeBalances() : {};
+
+  const leafAccounts = (type: Account["type"]) =>
+    accounts.filter(
+      (a) =>
+        a.type === type &&
+        !a.isGroup &&
+        (generated ? getBalance(a, balanceMap) !== 0 : a.currentBalance !== 0),
+    );
+
+  const assets = leafAccounts("Asset");
+  const liabilities = leafAccounts("Liability");
+  const equity = leafAccounts("Equity");
 
   const currentAssets = assets.filter((a) => {
     const p = accounts.find((x) => x.id === a.parentId);
@@ -47,7 +85,8 @@ export default function BalanceSheetPage() {
       names.includes("current") ||
       names.includes("cash") ||
       names.includes("receivable") ||
-      names.includes("inventory")
+      names.includes("inventory") ||
+      names.includes("stock")
     );
   });
   const fixedAssets = assets.filter((a) => !currentAssets.includes(a));
@@ -65,42 +104,42 @@ export default function BalanceSheetPage() {
   );
 
   const totalCurrentAssets = currentAssets.reduce(
-    (s, a) => s + a.currentBalance,
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
   const totalFixedAssets = fixedAssets.reduce(
-    (s, a) => s + a.currentBalance,
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
-  const totalAssets = assets.reduce((s, a) => s + a.currentBalance, 0);
+  const totalAssets = assets.reduce((s, a) => s + getBalance(a, balanceMap), 0);
   const totalCurrentLiab = currentLiabilities.reduce(
-    (s, a) => s + a.currentBalance,
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
   const totalLongTermLiab = longTermLiabilities.reduce(
-    (s, a) => s + a.currentBalance,
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
   const totalLiabilities = liabilities.reduce(
-    (s, a) => s + a.currentBalance,
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
-  const totalEquity = equity.reduce((s, a) => s + a.currentBalance, 0);
+  const totalEquity = equity.reduce((s, a) => s + getBalance(a, balanceMap), 0);
   const totalLiabEquity = totalLiabilities + totalEquity;
-  const balanced = Math.abs(totalAssets - totalLiabEquity) < 0.01;
+  const balanced = Math.abs(totalAssets - totalLiabEquity) < 1;
 
   const buildRows = () => [
     ["ASSETS", "", ""] as (string | number)[],
     ...currentAssets.map((a): (string | number)[] => [
       "Current Assets",
       a.name,
-      a.currentBalance,
+      getBalance(a, balanceMap),
     ]),
     ["Total Current Assets", "", totalCurrentAssets],
     ...fixedAssets.map((a): (string | number)[] => [
       "Fixed Assets",
       a.name,
-      a.currentBalance,
+      getBalance(a, balanceMap),
     ]),
     ["Total Fixed Assets", "", totalFixedAssets],
     ["TOTAL ASSETS", "", totalAssets],
@@ -108,19 +147,19 @@ export default function BalanceSheetPage() {
     ...currentLiabilities.map((a): (string | number)[] => [
       "Current Liabilities",
       a.name,
-      a.currentBalance,
+      getBalance(a, balanceMap),
     ]),
     ["Total Current Liabilities", "", totalCurrentLiab],
     ...longTermLiabilities.map((a): (string | number)[] => [
       "Long-term Liabilities",
       a.name,
-      a.currentBalance,
+      getBalance(a, balanceMap),
     ]),
     ["Total Long-term Liabilities", "", totalLongTermLiab],
     ...equity.map((a): (string | number)[] => [
       "Equity",
       a.name,
-      a.currentBalance,
+      getBalance(a, balanceMap),
     ]),
     ["Total Equity", "", totalEquity],
     ["TOTAL LIABILITIES + EQUITY", "", totalLiabEquity],
@@ -160,7 +199,12 @@ export default function BalanceSheetPage() {
     items,
     total,
     color,
-  }: { title: string; items: Account[]; total: number; color: string }) => (
+  }: {
+    title: string;
+    items: Account[];
+    total: number;
+    color: string;
+  }) => (
     <div className="space-y-1">
       <p className="font-semibold text-gray-700 bg-gray-50 px-2 py-1 rounded">
         {title}
@@ -168,7 +212,7 @@ export default function BalanceSheetPage() {
       {items.map((a) => (
         <div key={a.id} className="flex justify-between px-2 text-sm">
           <span className="text-gray-600">{a.name}</span>
-          <span className="font-mono">{fmt(a.currentBalance)}</span>
+          <span className="font-mono">{fmt(getBalance(a, balanceMap))}</span>
         </div>
       ))}
       {items.length === 0 && (
@@ -188,7 +232,9 @@ export default function BalanceSheetPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Balance Sheet</h1>
-          <p className="text-gray-600 mt-1">Assets = Liabilities + Equity</p>
+          <p className="text-gray-600 mt-1">
+            Assets = Liabilities + Equity — computed from journal entries
+          </p>
         </div>
         {generated && (
           <div className="flex gap-2">
@@ -228,7 +274,10 @@ export default function BalanceSheetPage() {
               <Input
                 type="date"
                 value={asOf}
-                onChange={(e) => setAsOf(e.target.value)}
+                onChange={(e) => {
+                  setAsOf(e.target.value);
+                  setGenerated(false);
+                }}
                 className="w-40"
                 data-ocid="balance_sheet.input"
               />
@@ -322,6 +371,13 @@ export default function BalanceSheetPage() {
               </CardContent>
             </Card>
           </div>
+          {journalEntries.filter((e) => e.date.slice(0, 10) <= asOf).length ===
+            0 && (
+            <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              ⚠ No journal entries found up to {asOf}. Balances shown from
+              account opening balances. Record transactions to see live data.
+            </div>
+          )}
         </>
       )}
     </div>

@@ -38,7 +38,7 @@ import { Edit, Layers, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
-import type { ItemCategory } from "../store/useStore";
+import type { Account, ItemCategory } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
@@ -46,6 +46,7 @@ export default function ItemCategoriesPage() {
   const {
     itemCategories,
     items,
+    accounts,
     addItemCategory,
     updateItemCategory,
     deleteItemCategory,
@@ -63,7 +64,27 @@ export default function ItemCategoriesPage() {
     parentId: "",
     seqNo: "",
     status: "active" as "active" | "inactive",
+    inventoryAccountId: "",
+    cogsAccountId: "",
+    salesAccountId: "",
   });
+
+  // Get leaf accounts by type for dropdowns
+  const leafAccountsByType = (types: Account["type"][]) =>
+    accounts
+      .filter(
+        (a) => !a.isGroup && a.status === "Active" && types.includes(a.type),
+      )
+      .sort((a, b) => a.code.localeCompare(b.code));
+
+  const inventoryAccounts = leafAccountsByType(["Asset"]);
+  const cogsAccounts = leafAccountsByType(["COGS"]);
+  const salesAccounts = leafAccountsByType(["Income"]);
+
+  const getAccountName = (id?: string) => {
+    if (!id) return "—";
+    return accounts.find((a) => a.id === id)?.name || "—";
+  };
 
   // Sort by seqNo then name
   const filtered = itemCategories
@@ -110,6 +131,9 @@ export default function ItemCategoriesPage() {
       parentId: "",
       seqNo: suggestSeqNo(),
       status: "active",
+      inventoryAccountId: "",
+      cogsAccountId: "",
+      salesAccountId: "",
     });
     setDialogOpen(true);
   };
@@ -123,6 +147,9 @@ export default function ItemCategoriesPage() {
       parentId: cat.parentId || "",
       seqNo: String(cat.seqNo ?? ""),
       status: cat.status,
+      inventoryAccountId: cat.inventoryAccountId || "",
+      cogsAccountId: cat.cogsAccountId || "",
+      salesAccountId: cat.salesAccountId || "",
     });
     setDialogOpen(true);
   };
@@ -146,6 +173,9 @@ export default function ItemCategoriesPage() {
       parentId: form.parentId || undefined,
       seqNo: Number.parseInt(form.seqNo) || 99,
       status: form.status,
+      inventoryAccountId: form.inventoryAccountId || undefined,
+      cogsAccountId: form.cogsAccountId || undefined,
+      salesAccountId: form.salesAccountId || undefined,
     };
     if (editingCat) {
       updateItemCategory(editingCat.id, data);
@@ -182,11 +212,24 @@ export default function ItemCategoriesPage() {
       c.name,
       getParentName(c.parentId),
       c.description || "",
+      getAccountName(c.inventoryAccountId),
+      getAccountName(c.cogsAccountId),
+      getAccountName(c.salesAccountId),
       c.status,
     ]);
     exportPDF(
       "Item Categories",
-      ["Seq", "Code", "Name", "Parent Category", "Description", "Status"],
+      [
+        "Seq",
+        "Code",
+        "Name",
+        "Parent",
+        "Description",
+        "Inv. Acct",
+        "COGS Acct",
+        "Sales Acct",
+        "Status",
+      ],
       rows,
       "item-categories.pdf",
       {
@@ -204,12 +247,25 @@ export default function ItemCategoriesPage() {
       c.name,
       getParentName(c.parentId),
       c.description || "",
+      getAccountName(c.inventoryAccountId),
+      getAccountName(c.cogsAccountId),
+      getAccountName(c.salesAccountId),
       c.status,
     ]);
     exportExcel(
       "item-categories.xlsx",
       "Categories",
-      ["Seq", "Code", "Name", "Parent Category", "Description", "Status"],
+      [
+        "Seq",
+        "Code",
+        "Name",
+        "Parent",
+        "Description",
+        "Inv. Acct",
+        "COGS Acct",
+        "Sales Acct",
+        "Status",
+      ],
       rows,
       {
         companyName: "BizPOS",
@@ -218,6 +274,40 @@ export default function ItemCategoriesPage() {
       },
     );
   };
+
+  const AccountSelect = ({
+    value,
+    onChange,
+    options,
+    placeholder,
+    ocid,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    options: Account[];
+    placeholder: string;
+    ocid: string;
+  }) => (
+    <Select
+      value={value || "none"}
+      onValueChange={(v) => onChange(v === "none" ? "" : v)}
+    >
+      <SelectTrigger data-ocid={ocid}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">— Use Default Mapping —</SelectItem>
+        {options.map((acc) => (
+          <SelectItem key={acc.id} value={acc.id}>
+            <span className="font-mono text-xs text-gray-400 mr-1">
+              {acc.code}
+            </span>
+            {acc.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 
   return (
     <div className="space-y-4 p-4">
@@ -229,7 +319,7 @@ export default function ItemCategoriesPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage product categories. Set Seq No to control the order shown in
-            POS.
+            POS. Map accounts to override default COA mapping per category.
           </p>
         </div>
         <div className="flex gap-2">
@@ -279,97 +369,129 @@ export default function ItemCategoriesPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table data-ocid="item_categories.table">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Seq</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Parent Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table data-ocid="item_categories.table">
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center py-8 text-muted-foreground"
-                    data-ocid="item_categories.empty_state"
-                  >
-                    No categories found
-                  </TableCell>
+                  <TableHead className="w-16">Seq</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Parent</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Inv. Acct</TableHead>
+                  <TableHead>COGS Acct</TableHead>
+                  <TableHead>Sales Acct</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filtered.map((cat, i) => (
-                  <TableRow
-                    key={cat.id}
-                    data-ocid={`item_categories.item.${i + 1}`}
-                  >
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 text-blue-700 text-xs font-bold">
-                        {cat.seqNo ?? "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm font-medium">
-                      {cat.code}
-                    </TableCell>
-                    <TableCell className="font-medium">{cat.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {getParentName(cat.parentId)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                      {cat.description || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          cat.status === "active" ? "default" : "secondary"
-                        }
-                        className={
-                          cat.status === "active"
-                            ? "bg-green-100 text-green-800 hover:bg-green-100"
-                            : ""
-                        }
-                      >
-                        {cat.status === "active" ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(cat)}
-                          data-ocid={`item_categories.edit_button.${i + 1}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(cat.id)}
-                          className="text-red-600 hover:bg-red-50"
-                          data-ocid={`item_categories.delete_button.${i + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={10}
+                      className="text-center py-8 text-muted-foreground"
+                      data-ocid="item_categories.empty_state"
+                    >
+                      No categories found
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filtered.map((cat, i) => (
+                    <TableRow
+                      key={cat.id}
+                      data-ocid={`item_categories.item.${i + 1}`}
+                    >
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 text-blue-700 text-xs font-bold">
+                          {cat.seqNo ?? "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium">
+                        {cat.code}
+                      </TableCell>
+                      <TableCell className="font-medium">{cat.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {getParentName(cat.parentId)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                        {cat.description || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {cat.inventoryAccountId ? (
+                          <span className="inline-block bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-xs">
+                            {getAccountName(cat.inventoryAccountId)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Default</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {cat.cogsAccountId ? (
+                          <span className="inline-block bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded text-xs">
+                            {getAccountName(cat.cogsAccountId)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Default</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {cat.salesAccountId ? (
+                          <span className="inline-block bg-green-50 text-green-700 px-1.5 py-0.5 rounded text-xs">
+                            {getAccountName(cat.salesAccountId)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Default</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            cat.status === "active" ? "default" : "secondary"
+                          }
+                          className={
+                            cat.status === "active"
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : ""
+                          }
+                        >
+                          {cat.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(cat)}
+                            data-ocid={`item_categories.edit_button.${i + 1}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteId(cat.id)}
+                            className="text-red-600 hover:bg-red-50"
+                            data-ocid={`item_categories.delete_button.${i + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="w-full max-w-[95vw] sm:max-w-lg"
+          className="w-full max-w-[95vw] sm:max-w-2xl"
           data-ocid="item_categories.dialog"
         >
           <DialogHeader>
@@ -446,6 +568,54 @@ export default function ItemCategoriesPage() {
                 data-ocid="item_categories.input"
               />
             </div>
+
+            {/* Account Mapping Section */}
+            <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
+              <p className="text-sm font-semibold text-gray-700">
+                Account Mapping (optional — overrides system defaults)
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-blue-600">
+                    Inventory Asset Account
+                  </Label>
+                  <AccountSelect
+                    value={form.inventoryAccountId}
+                    onChange={(v) =>
+                      setForm({ ...form, inventoryAccountId: v })
+                    }
+                    options={inventoryAccounts}
+                    placeholder="Use default inventory account"
+                    ocid="item_categories.select"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-yellow-700">
+                    COGS Account
+                  </Label>
+                  <AccountSelect
+                    value={form.cogsAccountId}
+                    onChange={(v) => setForm({ ...form, cogsAccountId: v })}
+                    options={cogsAccounts}
+                    placeholder="Use default COGS account"
+                    ocid="item_categories.select"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-green-700">
+                    Sales Revenue Account
+                  </Label>
+                  <AccountSelect
+                    value={form.salesAccountId}
+                    onChange={(v) => setForm({ ...form, salesAccountId: v })}
+                    options={salesAccounts}
+                    placeholder="Use default sales revenue account"
+                    ocid="item_categories.select"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Status</Label>
               <Select

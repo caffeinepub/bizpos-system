@@ -166,6 +166,22 @@ export interface ItemCategory {
   parentId?: string;
   seqNo: number;
   status: "active" | "inactive";
+  inventoryAccountId?: string;
+  cogsAccountId?: string;
+  salesAccountId?: string;
+}
+
+export interface AccountMapping {
+  cashAccountId: string; // default: acc-100-02-01-0002
+  bankAccountId: string; // default: acc-100-02-02-0001
+  accountsReceivableId: string; // default: acc-100-02-04
+  accountsPayableId: string; // default: acc-300-02-01-0001
+  inventoryAssetId: string; // default: acc-100-02-03
+  cogsAccountId: string; // default: acc-500-01-01
+  salesRevenueId: string; // default: acc-400-01-01-0001
+  salesTaxPayableId: string; // default: acc-300-02-01-0003
+  salaryExpenseId: string; // default: acc-600-01-01-0001
+  salaryPayableId: string; // default: acc-300-02-01-0002
 }
 
 export interface ItemBrand {
@@ -1496,6 +1512,34 @@ function createSeedData() {
       normalBalance: "Credit",
       isGroup: false,
       level: 3,
+    },
+    {
+      id: "acc-300-02-01-0003",
+      code: "300-02-01-0003",
+      name: "SALES TAX PAYABLE",
+      type: "Liability" as const,
+      parentId: "acc-300-02-01",
+      openingBalance: 0,
+      currentBalance: 0,
+      description: "Sales tax collected, owed to tax authority",
+      status: "Active" as const,
+      normalBalance: "Credit" as const,
+      isGroup: false,
+      level: 3,
+    },
+    {
+      id: "acc-100-02-04",
+      code: "100-02-04",
+      name: "ACCOUNTS RECEIVABLE",
+      type: "Asset" as const,
+      parentId: "acc-100-02",
+      openingBalance: 0,
+      currentBalance: 0,
+      description: "Money owed by customers",
+      status: "Active" as const,
+      normalBalance: "Debit" as const,
+      isGroup: false,
+      level: 2,
     },
 
     // ── L3 LEAF ACCOUNTS (under 400-01-01 SALES REVENUE)
@@ -2873,7 +2917,8 @@ const KEYS = {
   itemBrands: "bizpos_item_brands",
   itemUnits: "bizpos_item_units",
   stockMovements: "bizpos_stock_movements",
-  seeded: "bizpos_seeded_v13",
+  accountMapping: "bizpos_account_mapping",
+  seeded: "bizpos_seeded_v14",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -4045,6 +4090,26 @@ initStore();
   }
 })();
 
+// ---- Account Mapping Init ----
+(function ensureAccountMapping() {
+  const ACCT_MAP_KEY = "bizpos_account_mapping";
+  if (!localStorage.getItem(ACCT_MAP_KEY)) {
+    const defaultMapping: AccountMapping = {
+      cashAccountId: "acc-100-02-01-0002",
+      bankAccountId: "acc-100-02-02-0001",
+      accountsReceivableId: "acc-100-02-04",
+      accountsPayableId: "acc-300-02-01-0001",
+      inventoryAssetId: "acc-100-02-03",
+      cogsAccountId: "acc-500-01-01",
+      salesRevenueId: "acc-400-01-01-0001",
+      salesTaxPayableId: "acc-300-02-01-0003",
+      salaryExpenseId: "acc-600-01-01-0001",
+      salaryPayableId: "acc-300-02-01-0002",
+    };
+    localStorage.setItem(ACCT_MAP_KEY, JSON.stringify(defaultMapping));
+  }
+})();
+
 // ---- Store State ----
 interface StoreState {
   companies: Company[];
@@ -4348,6 +4413,38 @@ export function useStore() {
     [_log],
   );
 
+  // ---- Auto Journal Posting ----
+  const postAutoJournal = useCallback(
+    (entry: Omit<JournalEntry, "id" | "createdAt">) => {
+      const newEntry: JournalEntry = {
+        ...entry,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+      };
+      save(KEYS.journalEntries, [
+        ...load<JournalEntry[]>(KEYS.journalEntries, []),
+        newEntry,
+      ]);
+      // Update currentBalance on each affected account
+      const accs = load<Account[]>(KEYS.accounts, []);
+      const updated = accs.map((a) => {
+        let delta = 0;
+        for (const line of entry.lines) {
+          if (line.accountId !== a.id) continue;
+          if (a.normalBalance === "Debit") {
+            delta += line.debit - line.credit;
+          } else {
+            delta += line.credit - line.debit;
+          }
+        }
+        if (delta === 0) return a;
+        return { ...a, currentBalance: a.currentBalance + delta };
+      });
+      save(KEYS.accounts, updated);
+    },
+    [],
+  );
+
   // ---- Payrolls ----
   const addPayroll = useCallback(
     (payroll: Omit<Payroll, "id" | "createdAt">) => {
@@ -4358,8 +4455,40 @@ export function useStore() {
       };
       save(KEYS.payrolls, [...load<Payroll[]>(KEYS.payrolls, []), newPayroll]);
       _log("Payroll", "create", `Processed payroll for ${payroll.period}`);
+
+      // Auto-post: Dr Salary Expense / Cr Salary Payable (when Finalized)
+      if (newPayroll.status === "Finalized") {
+        const mapping = load<AccountMapping>(
+          "bizpos_account_mapping",
+          {} as AccountMapping,
+        );
+        const accs = load<Account[]>(KEYS.accounts, []);
+        const salExpId = mapping.salaryExpenseId || "acc-600-01-01-0001";
+        const salPayId = mapping.salaryPayableId || "acc-300-02-01-0002";
+        const salExpAcc = accs.find((a) => a.id === salExpId);
+        const salPayAcc = accs.find((a) => a.id === salPayId);
+        postAutoJournal({
+          date: newPayroll.createdAt.slice(0, 10),
+          reference: newPayroll.id,
+          description: `Payroll ${newPayroll.period} - ${newPayroll.employeeCount} employees`,
+          lines: [
+            {
+              accountId: salExpId,
+              accountName: salExpAcc?.name || "STAFF SALARIES",
+              debit: newPayroll.totalNet,
+              credit: 0,
+            },
+            {
+              accountId: salPayId,
+              accountName: salPayAcc?.name || "SALARIES PAYABLE",
+              debit: 0,
+              credit: newPayroll.totalNet,
+            },
+          ],
+        });
+      }
     },
-    [_log],
+    [_log, postAutoJournal],
   );
   const updatePayroll = useCallback(
     (id: string, payroll: Partial<Payroll>) => {
@@ -4542,8 +4671,119 @@ export function useStore() {
         });
       }
       _log("Sales", "create", `Created sale ${sale.id}`);
+
+      // Auto-post journal entry for sale
+      const mapping = load<AccountMapping>(
+        "bizpos_account_mapping",
+        {} as AccountMapping,
+      );
+      const saleAccounts = load<Account[]>(KEYS.accounts, []);
+      const itemCats = load<ItemCategory[]>(KEYS.itemCategories, []);
+      // Determine A/R or Cash based on sale type
+      const debitAccountId =
+        sale.saleType === "Credit"
+          ? mapping.accountsReceivableId || "acc-100-02-04"
+          : mapping.cashAccountId || "acc-100-02-01-0002";
+      const debitAcc = saleAccounts.find((a) => a.id === debitAccountId);
+      // Revenue account: use category mapping if available, else default
+      let revenueAccountId = mapping.salesRevenueId || "acc-400-01-01-0001";
+      const allItemsForSale = load<Item[]>(KEYS.items, []);
+      if (sale.items.length > 0) {
+        const firstItem = allItemsForSale.find(
+          (i) => i.id === sale.items[0].itemId,
+        );
+        if (firstItem?.categoryId) {
+          const cat = itemCats.find((c) => c.id === firstItem.categoryId);
+          if (cat?.salesAccountId) revenueAccountId = cat.salesAccountId;
+        }
+      }
+      const revenueAcc = saleAccounts.find((a) => a.id === revenueAccountId);
+      // COGS account
+      let cogsAccountId = mapping.cogsAccountId || "acc-500-01-01";
+      if (sale.items.length > 0) {
+        const firstItem2 = allItemsForSale.find(
+          (i) => i.id === sale.items[0].itemId,
+        );
+        if (firstItem2?.categoryId) {
+          const cat = itemCats.find((c) => c.id === firstItem2.categoryId);
+          if (cat?.cogsAccountId) cogsAccountId = cat.cogsAccountId;
+        }
+      }
+      const cogsAcc = saleAccounts.find((a) => a.id === cogsAccountId);
+      // Inventory account
+      let inventoryAccountId = mapping.inventoryAssetId || "acc-100-02-03";
+      if (sale.items.length > 0) {
+        const firstItem3 = allItemsForSale.find(
+          (i) => i.id === sale.items[0].itemId,
+        );
+        if (firstItem3?.categoryId) {
+          const cat = itemCats.find((c) => c.id === firstItem3.categoryId);
+          if (cat?.inventoryAccountId)
+            inventoryAccountId = cat.inventoryAccountId;
+        }
+      }
+      const inventoryAcc = saleAccounts.find(
+        (a) => a.id === inventoryAccountId,
+      );
+
+      const taxAmt = sale.taxAmount || 0;
+      const netRevenue = sale.total - taxAmt;
+      // Compute total cost of goods sold (use pre-sale item quantities for cost)
+      const totalCOGS = sale.items.reduce((sum, si) => {
+        const item = currentItems.find((i) => i.id === si.itemId);
+        return sum + (item ? item.costPrice * si.quantity : 0);
+      }, 0);
+
+      const journalLines: JournalLine[] = [];
+      // Dr A/R or Cash for full sale total
+      journalLines.push({
+        accountId: debitAccountId,
+        accountName: debitAcc?.name || "CASH IN HAND",
+        debit: sale.total,
+        credit: 0,
+      });
+      // Cr Sales Revenue
+      journalLines.push({
+        accountId: revenueAccountId,
+        accountName: revenueAcc?.name || "PRODUCT SALES",
+        debit: 0,
+        credit: netRevenue,
+      });
+      // Cr Sales Tax Payable (if tax)
+      if (taxAmt > 0) {
+        const taxPayableId = mapping.salesTaxPayableId || "acc-300-02-01-0003";
+        const taxPayableAcc = saleAccounts.find((a) => a.id === taxPayableId);
+        journalLines.push({
+          accountId: taxPayableId,
+          accountName: taxPayableAcc?.name || "SALES TAX PAYABLE",
+          debit: 0,
+          credit: taxAmt,
+        });
+      }
+      // Dr COGS / Cr Inventory (only if cost > 0)
+      if (totalCOGS > 0 && cogsAcc && inventoryAcc) {
+        journalLines.push({
+          accountId: cogsAccountId,
+          accountName: cogsAcc.name,
+          debit: totalCOGS,
+          credit: 0,
+        });
+        journalLines.push({
+          accountId: inventoryAccountId,
+          accountName: inventoryAcc.name,
+          debit: 0,
+          credit: totalCOGS,
+        });
+      }
+
+      postAutoJournal({
+        date: sale.saleDate,
+        reference: sale.id,
+        description: `Sale ${sale.id} - ${sale.customerName}`,
+        lines: journalLines,
+      });
     },
-    [_log, addStockMovement],
+    [_log, addStockMovement, postAutoJournal],
   );
   const updateSale = useCallback((id: string, sale: Partial<Sale>) => {
     save(
@@ -4585,8 +4825,40 @@ export function useStore() {
       }
       save(KEYS.purchases, [...load<Purchase[]>(KEYS.purchases, []), purchase]);
       _log("Purchases", "create", `Created purchase ${purchase.id}`);
+
+      // Auto-post journal: Dr Inventory / Cr Accounts Payable (when Received)
+      if (purchase.status === "Received") {
+        const mapping = load<AccountMapping>(
+          "bizpos_account_mapping",
+          {} as AccountMapping,
+        );
+        const accs = load<Account[]>(KEYS.accounts, []);
+        const invId = mapping.inventoryAssetId || "acc-100-02-03";
+        const apId = mapping.accountsPayableId || "acc-300-02-01-0001";
+        const invAcc = accs.find((a) => a.id === invId);
+        const apAcc = accs.find((a) => a.id === apId);
+        postAutoJournal({
+          date: purchase.purchaseDate,
+          reference: purchase.id,
+          description: `Purchase ${purchase.id} received from ${purchase.supplierName}`,
+          lines: [
+            {
+              accountId: invId,
+              accountName: invAcc?.name || "STOCK IN HAND",
+              debit: purchase.total,
+              credit: 0,
+            },
+            {
+              accountId: apId,
+              accountName: apAcc?.name || "ACCOUNTS PAYABLE",
+              debit: 0,
+              credit: purchase.total,
+            },
+          ],
+        });
+      }
     },
-    [_log],
+    [_log, postAutoJournal],
   );
   const updatePurchase = useCallback(
     (id: string, purchase: Partial<Purchase>) => {
@@ -4638,9 +4910,40 @@ export function useStore() {
           });
           save(KEYS.items, updatedItems);
         }
+        // Auto-post journal when newly received
+        if (oldStatus !== "Received" && newStatus === "Received") {
+          const mapping = load<AccountMapping>(
+            "bizpos_account_mapping",
+            {} as AccountMapping,
+          );
+          const accs = load<Account[]>(KEYS.accounts, []);
+          const invId = mapping.inventoryAssetId || "acc-100-02-03";
+          const apId = mapping.accountsPayableId || "acc-300-02-01-0001";
+          const invAcc = accs.find((a) => a.id === invId);
+          const apAcc = accs.find((a) => a.id === apId);
+          postAutoJournal({
+            date: mergedPurchase.purchaseDate,
+            reference: mergedPurchase.id,
+            description: `Purchase ${mergedPurchase.id} received from ${mergedPurchase.supplierName}`,
+            lines: [
+              {
+                accountId: invId,
+                accountName: invAcc?.name || "STOCK IN HAND",
+                debit: mergedPurchase.total,
+                credit: 0,
+              },
+              {
+                accountId: apId,
+                accountName: apAcc?.name || "ACCOUNTS PAYABLE",
+                debit: 0,
+                credit: mergedPurchase.total,
+              },
+            ],
+          });
+        }
       }
     },
-    [addStockMovement],
+    [addStockMovement, postAutoJournal],
   );
   const deletePurchase = useCallback((id: string) => {
     save(
@@ -4654,8 +4957,38 @@ export function useStore() {
     (payment: Payment) => {
       save(KEYS.payments, [...load<Payment[]>(KEYS.payments, []), payment]);
       _log("Payments", "create", `Payment ${payment.id} received`);
+
+      // Auto-post: Dr Cash / Cr Accounts Receivable
+      const mapping = load<AccountMapping>(
+        "bizpos_account_mapping",
+        {} as AccountMapping,
+      );
+      const accs = load<Account[]>(KEYS.accounts, []);
+      const cashId = mapping.cashAccountId || "acc-100-02-01-0002";
+      const arId = mapping.accountsReceivableId || "acc-100-02-04";
+      const cashAcc = accs.find((a) => a.id === cashId);
+      const arAcc = accs.find((a) => a.id === arId);
+      postAutoJournal({
+        date: payment.date,
+        reference: payment.id,
+        description: `Payment received from ${payment.customerName}`,
+        lines: [
+          {
+            accountId: cashId,
+            accountName: cashAcc?.name || "CASH IN HAND",
+            debit: payment.amount,
+            credit: 0,
+          },
+          {
+            accountId: arId,
+            accountName: arAcc?.name || "ACCOUNTS RECEIVABLE",
+            debit: 0,
+            credit: payment.amount,
+          },
+        ],
+      });
     },
-    [_log],
+    [_log, postAutoJournal],
   );
   const deletePayment = useCallback((id: string) => {
     save(
@@ -4706,8 +5039,39 @@ export function useStore() {
         createdAt: new Date().toISOString(),
       };
       save(KEYS.expenses, [...load<Expense[]>(KEYS.expenses, []), newExpense]);
+
+      // Auto-post: Dr Expense Account / Cr Cash
+      const mapping = load<AccountMapping>(
+        "bizpos_account_mapping",
+        {} as AccountMapping,
+      );
+      const accs = load<Account[]>(KEYS.accounts, []);
+      const cashId = mapping.cashAccountId || "acc-100-02-01-0002";
+      const cashAcc = accs.find((a) => a.id === cashId);
+      const expAcc = accs.find((a) => a.id === newExpense.accountId);
+      if (expAcc) {
+        postAutoJournal({
+          date: newExpense.date,
+          reference: newExpense.id,
+          description: `Expense: ${newExpense.description}`,
+          lines: [
+            {
+              accountId: newExpense.accountId,
+              accountName: expAcc.name,
+              debit: newExpense.amount,
+              credit: 0,
+            },
+            {
+              accountId: cashId,
+              accountName: cashAcc?.name || "CASH IN HAND",
+              debit: 0,
+              credit: newExpense.amount,
+            },
+          ],
+        });
+      }
     },
-    [],
+    [postAutoJournal],
   );
   const updateExpense = useCallback((id: string, expense: Partial<Expense>) => {
     save(
@@ -4794,13 +5158,71 @@ export function useStore() {
   }, []);
 
   // ---- Bank Transactions ----
-  const addBankTransaction = useCallback((t: Omit<BankTransaction, "id">) => {
-    const newT: BankTransaction = { ...t, id: generateId() };
-    save(KEYS.bankTransactions, [
-      ...load<BankTransaction[]>(KEYS.bankTransactions, []),
-      newT,
-    ]);
-  }, []);
+  const addBankTransaction = useCallback(
+    (t: Omit<BankTransaction, "id">) => {
+      const newT: BankTransaction = { ...t, id: generateId() };
+      save(KEYS.bankTransactions, [
+        ...load<BankTransaction[]>(KEYS.bankTransactions, []),
+        newT,
+      ]);
+
+      // Auto-post bank transaction journal entry
+      const mapping = load<AccountMapping>(
+        "bizpos_account_mapping",
+        {} as AccountMapping,
+      );
+      const accs = load<Account[]>(KEYS.accounts, []);
+      const bankId = mapping.bankAccountId || "acc-100-02-02-0001";
+      const cashId = mapping.cashAccountId || "acc-100-02-01-0002";
+      const bankAcc = accs.find((a) => a.id === bankId);
+      const cashAcc = accs.find((a) => a.id === cashId);
+      const counterpartId = cashId;
+      const counterpartAcc = cashAcc;
+      // Credit type = money coming in (deposit), Debit type = money going out (withdrawal)
+      if (newT.type === "Credit") {
+        postAutoJournal({
+          date: newT.date,
+          reference: newT.id,
+          description: `Bank deposit: ${newT.description}`,
+          lines: [
+            {
+              accountId: bankId,
+              accountName: bankAcc?.name || "MAIN ACCOUNT",
+              debit: newT.amount,
+              credit: 0,
+            },
+            {
+              accountId: counterpartId,
+              accountName: counterpartAcc?.name || "CASH IN HAND",
+              debit: 0,
+              credit: newT.amount,
+            },
+          ],
+        });
+      } else if (newT.type === "Debit") {
+        postAutoJournal({
+          date: newT.date,
+          reference: newT.id,
+          description: `Bank withdrawal: ${newT.description}`,
+          lines: [
+            {
+              accountId: counterpartId,
+              accountName: counterpartAcc?.name || "CASH IN HAND",
+              debit: newT.amount,
+              credit: 0,
+            },
+            {
+              accountId: bankId,
+              accountName: bankAcc?.name || "MAIN ACCOUNT",
+              debit: 0,
+              credit: newT.amount,
+            },
+          ],
+        });
+      }
+    },
+    [postAutoJournal],
+  );
 
   const updateBankTransaction = useCallback(
     (id: string, t: Partial<BankTransaction>) => {
@@ -5462,5 +5884,21 @@ export function useStore() {
     deleteItemUnit,
     addStockMovement,
     stockMovements: state.stockMovements,
+    accountMapping: load<AccountMapping>("bizpos_account_mapping", {
+      cashAccountId: "acc-100-02-01-0002",
+      bankAccountId: "acc-100-02-02-0001",
+      accountsReceivableId: "acc-100-02-04",
+      accountsPayableId: "acc-300-02-01-0001",
+      inventoryAssetId: "acc-100-02-03",
+      cogsAccountId: "acc-500-01-01",
+      salesRevenueId: "acc-400-01-01-0001",
+      salesTaxPayableId: "acc-300-02-01-0003",
+      salaryExpenseId: "acc-600-01-01-0001",
+      salaryPayableId: "acc-300-02-01-0002",
+    }),
+    saveAccountMapping: (mapping: AccountMapping) => {
+      localStorage.setItem("bizpos_account_mapping", JSON.stringify(mapping));
+      window.dispatchEvent(new Event("bizpos-store-updated"));
+    },
   };
 }

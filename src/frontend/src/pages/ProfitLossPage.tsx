@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import type { Account } from "../store/useStore";
 import { useStore } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
@@ -14,37 +15,85 @@ function fmt(n: number) {
 }
 
 export default function ProfitLossPage() {
-  const { accounts } = useStore();
+  const { accounts, journalEntries } = useStore();
+  const { currentUser } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const firstOfMonth = `${today.slice(0, 7)}-01`;
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(today);
   const [generated, setGenerated] = useState(false);
 
+  // Compute account balances from journal entries for selected date range
+  const computeBalances = (): Record<string, number> => {
+    const balanceMap: Record<string, number> = {};
+    for (const entry of journalEntries) {
+      const d = entry.date.slice(0, 10);
+      if (d < fromDate || d > toDate) continue;
+      for (const line of entry.lines) {
+        const acc = accounts.find((a) => a.id === line.accountId);
+        if (!acc) continue;
+        if (!balanceMap[line.accountId]) balanceMap[line.accountId] = 0;
+        if (acc.normalBalance === "Debit") {
+          balanceMap[line.accountId] += line.debit - line.credit;
+        } else {
+          balanceMap[line.accountId] += line.credit - line.debit;
+        }
+      }
+    }
+    return balanceMap;
+  };
+
+  const getBalance = (
+    acc: Account,
+    balanceMap: Record<string, number>,
+  ): number => {
+    if (balanceMap[acc.id] !== undefined) return Math.abs(balanceMap[acc.id]);
+    // Fall back to currentBalance if no journal entries for this period
+    return Math.abs(acc.currentBalance);
+  };
+
   const income = accounts.filter((a) => a.type === "Income" && !a.isGroup);
   const cogs = accounts.filter((a) => a.type === "COGS" && !a.isGroup);
   const expenses = accounts.filter((a) => a.type === "Expense" && !a.isGroup);
 
-  const totalIncome = income.reduce(
-    (s, a) => s + Math.abs(a.currentBalance),
+  // Always compute balances for display (after Generate)
+  const balanceMap = generated ? computeBalances() : {};
+
+  // Only show accounts with non-zero balance in the period
+  const incomeWithBalance = generated
+    ? income.filter((a) => getBalance(a, balanceMap) > 0)
+    : income.filter((a) => Math.abs(a.currentBalance) > 0);
+  const cogsWithBalance = generated
+    ? cogs.filter((a) => getBalance(a, balanceMap) > 0)
+    : cogs.filter((a) => Math.abs(a.currentBalance) > 0);
+  const expensesWithBalance = generated
+    ? expenses.filter((a) => getBalance(a, balanceMap) > 0)
+    : expenses.filter((a) => Math.abs(a.currentBalance) > 0);
+
+  const totalIncome = incomeWithBalance.reduce(
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
-  const totalCOGS = cogs.reduce((s, a) => s + Math.abs(a.currentBalance), 0);
+  const totalCOGS = cogsWithBalance.reduce(
+    (s, a) => s + getBalance(a, balanceMap),
+    0,
+  );
   const grossProfit = totalIncome - totalCOGS;
-  const totalExpenses = expenses.reduce(
-    (s, a) => s + Math.abs(a.currentBalance),
+  const totalExpenses = expensesWithBalance.reduce(
+    (s, a) => s + getBalance(a, balanceMap),
     0,
   );
   const netIncome = grossProfit - totalExpenses;
 
   const handleExportPDF = () => {
+    const bm = computeBalances();
     const rows: (string | number)[][] = [
-      ...income.map((a) => ["Income", a.name, Math.abs(a.currentBalance)]),
+      ...incomeWithBalance.map((a) => ["Income", a.name, getBalance(a, bm)]),
       ["Total Income", "", totalIncome],
-      ...cogs.map((a) => ["COGS", a.name, Math.abs(a.currentBalance)]),
+      ...cogsWithBalance.map((a) => ["COGS", a.name, getBalance(a, bm)]),
       ["Total COGS", "", totalCOGS],
       ["Gross Profit", "", grossProfit],
-      ...expenses.map((a) => ["Expense", a.name, Math.abs(a.currentBalance)]),
+      ...expensesWithBalance.map((a) => ["Expense", a.name, getBalance(a, bm)]),
       ["Total Expenses", "", totalExpenses],
       ["Net Income", "", netIncome],
     ];
@@ -53,17 +102,26 @@ export default function ProfitLossPage() {
       ["Section", "Account", "Amount"],
       rows,
       `profit-loss-${fromDate}-${toDate}.pdf`,
+      {
+        companyName: "BizPOS System",
+        generatedBy: currentUser?.name ?? "Unknown",
+        filters: [
+          { label: "From", value: fromDate },
+          { label: "To", value: toDate },
+        ],
+      },
     );
   };
 
   const handleExportExcel = () => {
+    const bm = computeBalances();
     const rows: (string | number)[][] = [
-      ...income.map((a) => ["Income", a.name, Math.abs(a.currentBalance)]),
+      ...incomeWithBalance.map((a) => ["Income", a.name, getBalance(a, bm)]),
       ["Total Income", "", totalIncome],
-      ...cogs.map((a) => ["COGS", a.name, Math.abs(a.currentBalance)]),
+      ...cogsWithBalance.map((a) => ["COGS", a.name, getBalance(a, bm)]),
       ["Total COGS", "", totalCOGS],
       ["Gross Profit", "", grossProfit],
-      ...expenses.map((a) => ["Expense", a.name, Math.abs(a.currentBalance)]),
+      ...expensesWithBalance.map((a) => ["Expense", a.name, getBalance(a, bm)]),
       ["Total Expenses", "", totalExpenses],
       ["Net Income", "", netIncome],
     ];
@@ -72,6 +130,15 @@ export default function ProfitLossPage() {
       "Profit & Loss",
       ["Section", "Account", "Amount"],
       rows,
+      {
+        companyName: "BizPOS System",
+        reportTitle: `Profit & Loss: ${fromDate} to ${toDate}`,
+        generatedBy: currentUser?.name ?? "Unknown",
+        filters: [
+          { label: "From", value: fromDate },
+          { label: "To", value: toDate },
+        ],
+      },
     );
   };
 
@@ -83,7 +150,8 @@ export default function ProfitLossPage() {
             Profit &amp; Loss
           </h1>
           <p className="text-gray-600 mt-1">
-            Income statement for the selected period
+            Income statement for the selected period — computed from journal
+            entries
           </p>
         </div>
         {generated && (
@@ -124,7 +192,10 @@ export default function ProfitLossPage() {
               <Input
                 type="date"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setGenerated(false);
+                }}
                 className="w-40"
                 data-ocid="profit_loss.input"
               />
@@ -134,7 +205,10 @@ export default function ProfitLossPage() {
               <Input
                 type="date"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setGenerated(false);
+                }}
                 className="w-40"
               />
             </div>
@@ -160,17 +234,17 @@ export default function ProfitLossPage() {
               <p className="font-semibold text-gray-700 bg-green-50 px-2 py-1 rounded">
                 Income
               </p>
-              {income.map((a) => (
+              {incomeWithBalance.map((a) => (
                 <div key={a.id} className="flex justify-between px-2 text-sm">
                   <span className="text-gray-600">{a.name}</span>
                   <span className="font-mono text-green-700">
-                    {fmt(Math.abs(a.currentBalance))}
+                    {fmt(getBalance(a, balanceMap))}
                   </span>
                 </div>
               ))}
-              {income.length === 0 && (
+              {incomeWithBalance.length === 0 && (
                 <div className="text-xs text-gray-400 px-2">
-                  No income accounts with balance
+                  No income recorded for this period
                 </div>
               )}
               <div className="flex justify-between px-2 font-bold text-sm border-t mt-1 pt-1 text-green-700">
@@ -178,16 +252,16 @@ export default function ProfitLossPage() {
                 <span className="font-mono">{fmt(totalIncome)}</span>
               </div>
             </div>
-            {cogs.length > 0 && (
+            {cogsWithBalance.length > 0 && (
               <div className="space-y-1">
                 <p className="font-semibold text-gray-700 bg-yellow-50 px-2 py-1 rounded">
                   Cost of Goods Sold
                 </p>
-                {cogs.map((a) => (
+                {cogsWithBalance.map((a) => (
                   <div key={a.id} className="flex justify-between px-2 text-sm">
                     <span className="text-gray-600">{a.name}</span>
                     <span className="font-mono text-red-600">
-                      {fmt(Math.abs(a.currentBalance))}
+                      {fmt(getBalance(a, balanceMap))}
                     </span>
                   </div>
                 ))}
@@ -201,7 +275,9 @@ export default function ProfitLossPage() {
             <div className="flex justify-between px-2 font-bold text-base">
               <span>Gross Profit</span>
               <span
-                className={`font-mono ${grossProfit >= 0 ? "text-green-700" : "text-red-700"}`}
+                className={`font-mono ${
+                  grossProfit >= 0 ? "text-green-700" : "text-red-700"
+                }`}
               >
                 {fmt(grossProfit)}
               </span>
@@ -211,17 +287,17 @@ export default function ProfitLossPage() {
               <p className="font-semibold text-gray-700 bg-red-50 px-2 py-1 rounded">
                 Operating Expenses
               </p>
-              {expenses.map((a) => (
+              {expensesWithBalance.map((a) => (
                 <div key={a.id} className="flex justify-between px-2 text-sm">
                   <span className="text-gray-600">{a.name}</span>
                   <span className="font-mono text-red-600">
-                    {fmt(Math.abs(a.currentBalance))}
+                    {fmt(getBalance(a, balanceMap))}
                   </span>
                 </div>
               ))}
-              {expenses.length === 0 && (
+              {expensesWithBalance.length === 0 && (
                 <div className="text-xs text-gray-400 px-2">
-                  No expense accounts with balance
+                  No expenses recorded for this period
                 </div>
               )}
               <div className="flex justify-between px-2 font-bold text-sm border-t mt-1 pt-1 text-red-600">
@@ -231,11 +307,26 @@ export default function ProfitLossPage() {
             </div>
             <Separator />
             <div
-              className={`flex justify-between px-2 font-bold text-xl rounded p-3 ${netIncome >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}
+              className={`flex justify-between px-2 font-bold text-xl rounded p-3 ${
+                netIncome >= 0
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-700"
+              }`}
             >
               <span>Net Income</span>
               <span className="font-mono">{fmt(netIncome)}</span>
             </div>
+            {journalEntries.filter(
+              (e) =>
+                e.date.slice(0, 10) >= fromDate &&
+                e.date.slice(0, 10) <= toDate,
+            ).length === 0 && (
+              <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                ⚠ No journal entries found for this period. Balances shown from
+                account opening balances. Record transactions to see live
+                P&amp;L.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

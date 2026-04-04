@@ -10,6 +10,7 @@ import {
 import { ThemeProvider } from "next-themes";
 import AppLayout from "./components/AppLayout";
 import { AuthProvider } from "./context/AuthContext";
+import AccountMappingPage from "./pages/AccountMappingPage";
 import AllowanceTypesPage from "./pages/AllowanceTypesPage";
 import AttendancePage from "./pages/AttendancePage";
 import BalanceSheetPage from "./pages/BalanceSheetPage";
@@ -1163,6 +1164,11 @@ const chartOfAccountsRoute = createRoute({
   path: "/chart-of-accounts",
   component: ChartOfAccountsPage,
 });
+const accountMappingRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/account-mapping",
+  component: AccountMappingPage,
+});
 const journalEntriesRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/journal-entries",
@@ -1420,6 +1426,7 @@ const routeTree = rootRoute.addChildren([
     receivePaymentRoute,
     paymentHistoryRoute,
     chartOfAccountsRoute,
+    accountMappingRoute,
     journalEntriesRoute,
     expensesRoute,
     expenseCategoriesRoute,
