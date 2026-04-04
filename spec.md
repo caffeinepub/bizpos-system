@@ -1,35 +1,35 @@
 # BizPOS System
 
 ## Current State
-AppLayout.tsx has a left sidebar (slate-900) with:
-- Logo + collapse toggle at top
-- Nav groups in the middle
-- A user info section at the bottom showing: company name, username, role badge, and logout button
-
-The desktop top bar (hidden md:flex) shows only: FavoritesButton, BookmarkButton, NotificationBell — all right-aligned.
-
-There are no keyboard shortcuts for screen navigation.
+The top bar has the company name pill, user name + role displayed as text, and a standalone logout icon button. The sidebar bottom has a dedicated logout button (icon + text when expanded). The `?` keyboard shortcut is supposed to toggle the shortcuts panel but it's broken — the `KeyboardShortcuts` component manages its own `open` state but the `?` key handler inside that same component uses a keydown listener on `window`, so if the modal is open, pressing `?` may not reach the handler correctly because the modal overlay captures events.
 
 ## Requested Changes (Diff)
 
 ### Add
-- In the desktop top bar: company name (with switch button for super users), logged-in user's name + role badge, and a logout button — placed on the right side of the top bar after the icon buttons
-- A keyboard shortcut system: pressing `G` then a letter (or just a shortcut key combo) navigates to common screens. A modal or tooltip should show available shortcuts. Standard approach: hold `?` or press `?` to see shortcut cheatsheet. Alt+key or just letter pairs (go-to navigation: press `G` then `D` for Dashboard, `G`+`P` for POS, etc.)
+- A circular user avatar/icon button in the top bar (rightmost, replacing the standalone logout button and the username text block)
+- A dropdown panel that opens below the avatar button when clicked, showing:
+  - User avatar (initials circle, large)
+  - User full name
+  - Role name (with Super badge if superUser)
+  - A visual divider
+  - Logout button/link (full width, red styled)
+- A `UserProfileDropdown` component (inside AppLayout.tsx)
 
 ### Modify
-- Remove the user info block (company name, username, role, logout button) from the sidebar bottom section — keep only the logout icon button when sidebar is collapsed, but move everything to the top bar
-- Desktop top bar: add company name pill + user name + role + logout button to the RIGHT side
-- Keep the mobile sidebar user info section as-is (it's a different layout)
+- Remove the username + role text block (`nav.user.panel`) from the desktop top bar — it moves into the dropdown
+- Remove the logout icon button from the desktop top bar — it moves into the dropdown
+- Remove the logout button entirely from the sidebar bottom — the sidebar bottom div should be removed or just left empty / removed
+- Fix `?` shortcut: the issue is that the `?` key listener fires `setOpen(prev => !prev)` but the modal overlay has a `tabIndex=-1` and captures events. The fix is to ensure the keydown handler checks if the modal is already open and if `?` is pressed, it closes regardless. Also make sure the handler is not accidentally blocked. A reliable fix: move the `?` toggle to use a `useEffect` that explicitly checks `open` state via a ref so stale closures don't cause issues.
+- On mobile top bar: also replace the user section with just the avatar icon (no text)
 
 ### Remove
-- The `!collapsed` user info block from sidebar bottom
-- Logout button from sidebar (desktop only) — it moves to top bar
+- Sidebar bottom logout button and its containing div
+- Username/role text block in desktop top bar
+- Standalone logout button in desktop top bar
 
 ## Implementation Plan
-1. Update the desktop top bar div to include: left side (page title or breadcrumb placeholder) and right side (Favorites, Bookmarks, Notifications, then a divider, then company name pill, user avatar/name, logout button)
-2. Remove the user info + logout from the desktop sidebar bottom; keep the sidebar bottom clean or remove entirely
-3. Add a KeyboardShortcuts component:
-   - Listens for `?` key (no modifier needed) to open a cheat sheet modal
-   - Listens for two-key sequences: `G` then `D`=Dashboard, `G`+`S`=Sales, `G`+`P`=POS, `G`+`I`=Inventory, `G`+`U`=Users, `G`+`R`=Reports, `G`+`A`=Accounts, `G`+`E`=Employees, `G`+`B`=Banking, `G`+`T`=Tickets, `G`+`O`=Purchase Orders, `G`+`C`=Customers
-   - Ignore shortcuts when focus is inside an input/textarea/select
-   - Show a small dismissable modal listing all shortcuts when `?` is pressed
+1. Add `UserProfileDropdown` component to AppLayout.tsx that renders a circular avatar button with user initials, and a dropdown containing full name, role, Super badge, divider, and logout action
+2. Replace the `{/* User name + role */}` and `{/* Logout button */}` blocks in the desktop topbar with `<UserProfileDropdown />`
+3. Remove the sidebar bottom section that contains the logout button
+4. Fix the `?` shortcut by using a `openRef` in `KeyboardShortcuts` that stays in sync with `open` state, so the keydown handler reads from the ref instead of closing over stale state
+5. Validate and deploy

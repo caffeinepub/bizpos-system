@@ -58,6 +58,7 @@ import {
   TrendingDown,
   TrendingUp,
   Truck,
+  UserCircle,
   UserSquare,
   Users,
   Wallet,
@@ -810,8 +811,13 @@ function KeyboardShortcuts({
   navigateTo: (path: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const openRef = useRef(false);
   const waitingRef = useRef(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -831,7 +837,7 @@ function KeyboardShortcuts({
       // Toggle cheatsheet on ?
       if (e.key === "?") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen(!openRef.current);
         waitingRef.current = false;
         if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
         return;
@@ -839,7 +845,7 @@ function KeyboardShortcuts({
 
       // Close modal on Escape
       if (e.key === "Escape") {
-        setOpen(false);
+        if (openRef.current) setOpen(false);
         waitingRef.current = false;
         if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
         return;
@@ -1027,6 +1033,102 @@ function AccessGuard() {
   return <Outlet />;
 }
 
+const getInitials = (name: string) => {
+  const parts = name?.trim().split(" ").filter(Boolean);
+  if (!parts?.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+function UserProfileDropdown({
+  currentUser,
+  logout,
+  navigate,
+}: {
+  currentUser: any;
+  logout: () => void;
+  navigate: (opts: { to: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const initials = getInitials(currentUser?.name ?? "");
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+        title={currentUser?.name ?? "Profile"}
+        data-ocid="nav.user.open_modal_button"
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-2 z-50 min-w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl py-3"
+          data-ocid="nav.user.panel"
+        >
+          {/* Avatar + name */}
+          <div className="flex flex-col items-center px-4 pb-3">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 text-white text-lg font-bold mb-2">
+              {initials}
+            </div>
+            <p className="text-sm font-semibold text-slate-800 text-center">
+              {currentUser?.name}
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-xs text-slate-400">
+                {currentUser?.roleName}
+              </span>
+              {currentUser?.isSuperUser && (
+                <Badge className="text-[10px] px-1 py-0 bg-purple-600 text-white border-0">
+                  Super
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-100 my-1" />
+
+          {/* Logout */}
+          <div className="px-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                logout();
+                navigate({ to: "/" });
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
+              data-ocid="nav.logout.button"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AppLayout() {
   const { currentUser, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -1203,23 +1305,6 @@ export default function AppLayout() {
             <SidebarItem key={group.key} group={group} />
           ))}
         </nav>
-
-        {/* Sidebar bottom — minimal logout only (user info moved to topbar) */}
-        <div className="border-t border-slate-700 p-2">
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              navigate({ to: "/" });
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
-            title="Logout"
-            data-ocid="nav.logout.button"
-          >
-            <LogOut className="h-4 w-4 flex-shrink-0" />
-            {!collapsed && <span className="text-sm">Logout</span>}
-          </button>
-        </div>
       </div>
 
       {/* Flyout Panel */}
@@ -1349,25 +1434,6 @@ export default function AppLayout() {
             </div>
           ))}
         </nav>
-        <div className="border-t border-slate-700 p-3">
-          <p className="text-white text-sm font-medium px-2">
-            {currentUser?.name}
-          </p>
-          <p className="text-slate-400 text-xs px-2 mb-2">
-            {currentUser?.roleName}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              navigate({ to: "/" });
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="text-sm">Logout</span>
-          </button>
-        </div>
       </div>
 
       {/* Main content */}
@@ -1446,39 +1512,11 @@ export default function AppLayout() {
                 </span>
               ))}
 
-            {/* User name + role */}
-            <div
-              className="flex flex-col items-end leading-none gap-0.5 px-2"
-              data-ocid="nav.user.panel"
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-slate-700">
-                  {currentUser?.name}
-                </span>
-                {currentUser?.isSuperUser && (
-                  <Badge className="text-[10px] px-1 py-0 bg-purple-600 text-white border-0">
-                    Super
-                  </Badge>
-                )}
-              </div>
-              <span className="text-xs text-slate-400">
-                {currentUser?.roleName}
-              </span>
-            </div>
-
-            {/* Logout button */}
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                navigate({ to: "/" });
-              }}
-              title="Logout"
-              className="p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-              data-ocid="nav.topbar.logout.button"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+            <UserProfileDropdown
+              currentUser={currentUser}
+              logout={logout}
+              navigate={navigate}
+            />
           </div>
         </div>
 
