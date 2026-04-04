@@ -2037,6 +2037,12 @@ function createSeedData() {
     { id: "pm-003", name: "JazzCash", description: "JazzCash mobile payment" },
   ];
 
+  const daysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  };
+
   const sales: Sale[] = [
     {
       id: "SALE-001",
@@ -2072,8 +2078,8 @@ function createSeedData() {
       paidAmount: 57000,
       balanceDue: 0,
       status: "Completed",
-      saleDate: "2024-03-15",
-      createdAt: "2024-03-15T10:00:00Z",
+      saleDate: daysAgo(2),
+      createdAt: new Date(daysAgo(2)).toISOString(),
     },
     {
       id: "SALE-002",
@@ -2102,8 +2108,8 @@ function createSeedData() {
       paidAmount: 5000,
       balanceDue: 8000,
       status: "Pending",
-      saleDate: "2024-03-18",
-      createdAt: "2024-03-18T14:00:00Z",
+      saleDate: daysAgo(1),
+      createdAt: new Date(daysAgo(1)).toISOString(),
     },
   ];
 
@@ -2114,7 +2120,7 @@ function createSeedData() {
       supplierName: "Tech Distributors Ltd",
       warehouseId: "wh1",
       warehouseName: "Main Warehouse",
-      purchaseDate: "2024-03-01",
+      purchaseDate: daysAgo(4),
       items: [
         {
           itemId: "item-001",
@@ -2127,7 +2133,7 @@ function createSeedData() {
       total: 450000,
       notes: "Regular stock replenishment",
       status: "Received",
-      createdAt: "2024-03-01T10:00:00Z",
+      createdAt: new Date(daysAgo(4)).toISOString(),
     },
     {
       id: "PUR-002",
@@ -2135,7 +2141,7 @@ function createSeedData() {
       supplierName: "Galaxy Electronics",
       warehouseId: "wh1",
       warehouseName: "Main Warehouse",
-      purchaseDate: "2024-03-10",
+      purchaseDate: daysAgo(3),
       items: [
         {
           itemId: "item-004",
@@ -2154,7 +2160,7 @@ function createSeedData() {
       ],
       total: 110000,
       status: "Received",
-      createdAt: "2024-03-10T11:00:00Z",
+      createdAt: new Date(daysAgo(3)).toISOString(),
     },
   ];
 
@@ -2918,7 +2924,7 @@ const KEYS = {
   itemUnits: "bizpos_item_units",
   stockMovements: "bizpos_stock_movements",
   accountMapping: "bizpos_account_mapping",
-  seeded: "bizpos_seeded_v15",
+  seeded: "bizpos_seeded_v16",
 };
 
 function load<T>(key: string, fallback: T): T {

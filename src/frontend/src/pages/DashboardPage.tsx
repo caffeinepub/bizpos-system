@@ -77,9 +77,11 @@ export default function DashboardPage() {
   );
 
   const today = new Date().toISOString().slice(0, 10);
-  const todaySales = filteredSales.filter((s) => s.saleDate === today);
+  const todaySales = filteredSales.filter(
+    (s) => (s.saleDate || s.createdAt?.slice(0, 10)) === today,
+  );
   const todayPurchases = filteredPurchases.filter(
-    (p) => p.purchaseDate === today,
+    (p) => (p.purchaseDate || p.createdAt?.slice(0, 10)) === today,
   );
 
   const totalSalesToday = todaySales.reduce((sum, s) => sum + s.total, 0);
@@ -111,10 +113,12 @@ export default function DashboardPage() {
       const dateStr = d.toISOString().slice(0, 10);
       const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
       const daySales = filteredSales
-        .filter((s) => s.saleDate === dateStr)
+        .filter((s) => (s.saleDate || s.createdAt?.slice(0, 10)) === dateStr)
         .reduce((sum, s) => sum + s.total, 0);
       const dayPurchases = filteredPurchases
-        .filter((p) => p.purchaseDate === dateStr)
+        .filter(
+          (p) => (p.purchaseDate || p.createdAt?.slice(0, 10)) === dateStr,
+        )
         .reduce((sum, p) => sum + p.total, 0);
       result.push({ name: dayLabel, sales: daySales, purchases: dayPurchases });
     }

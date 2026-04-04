@@ -34,7 +34,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Layers, Plus, Search, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  Info,
+  Layers,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -57,6 +66,7 @@ export default function ItemCategoriesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingCat, setEditingCat] = useState<ItemCategory | null>(null);
+  const [showAccountMapping, setShowAccountMapping] = useState(false);
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -124,6 +134,7 @@ export default function ItemCategoriesPage() {
 
   const openAdd = () => {
     setEditingCat(null);
+    setShowAccountMapping(false);
     setForm({
       code: suggestCode(),
       name: "",
@@ -140,6 +151,10 @@ export default function ItemCategoriesPage() {
 
   const openEdit = (cat: ItemCategory) => {
     setEditingCat(cat);
+    // Auto-expand account mapping section if the category already has custom accounts set
+    setShowAccountMapping(
+      !!(cat.inventoryAccountId || cat.cogsAccountId || cat.salesAccountId),
+    );
     setForm({
       code: cat.code,
       name: cat.name,
@@ -296,7 +311,7 @@ export default function ItemCategoriesPage() {
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="none">— Use Default Mapping —</SelectItem>
+        <SelectItem value="none">— Use System Default —</SelectItem>
         {options.map((acc) => (
           <SelectItem key={acc.id} value={acc.id}>
             <span className="font-mono text-xs text-gray-400 mr-1">
@@ -569,51 +584,107 @@ export default function ItemCategoriesPage() {
               />
             </div>
 
-            {/* Account Mapping Section */}
-            <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
-              <p className="text-sm font-semibold text-gray-700">
-                Account Mapping (optional — overrides system defaults)
-              </p>
-              <div className="grid grid-cols-1 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-blue-600">
-                    Inventory Asset Account
-                  </Label>
-                  <AccountSelect
-                    value={form.inventoryAccountId}
-                    onChange={(v) =>
-                      setForm({ ...form, inventoryAccountId: v })
-                    }
-                    options={inventoryAccounts}
-                    placeholder="Use default inventory account"
-                    ocid="item_categories.select"
-                  />
+            {/* Account Mapping Section - Collapsible Advanced Option */}
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAccountMapping(!showAccountMapping)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  {showAccountMapping ? (
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                  )}
+                  <span className="text-sm font-medium text-gray-700">
+                    Advanced: Accounting Accounts
+                  </span>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    Optional
+                  </span>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-yellow-700">
-                    COGS Account
-                  </Label>
-                  <AccountSelect
-                    value={form.cogsAccountId}
-                    onChange={(v) => setForm({ ...form, cogsAccountId: v })}
-                    options={cogsAccounts}
-                    placeholder="Use default COGS account"
-                    ocid="item_categories.select"
-                  />
+              </button>
+
+              {showAccountMapping && (
+                <div className="p-4 space-y-4 border-t bg-white">
+                  {/* Plain-language explanation */}
+                  <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                    <div>
+                      <p className="font-medium mb-1">What is this?</p>
+                      <p className="text-xs leading-relaxed">
+                        When items in this category are bought or sold, the
+                        system automatically records the transaction in your
+                        accounting books. By default, it uses the accounts set
+                        in <strong>Accounting → Account Mapping</strong>.
+                      </p>
+                      <p className="text-xs leading-relaxed mt-1">
+                        Use these fields <strong>only</strong> if this category
+                        needs different accounts than the system default — for
+                        example, if you track electronics inventory separately
+                        from clothing inventory in your accounts.
+                        <strong> Leave blank to use system defaults.</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-700">
+                        Inventory Asset Account
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        The balance sheet account where the stock value of this
+                        category is recorded.
+                      </p>
+                      <AccountSelect
+                        value={form.inventoryAccountId}
+                        onChange={(v) =>
+                          setForm({ ...form, inventoryAccountId: v })
+                        }
+                        options={inventoryAccounts}
+                        placeholder="— Use system default —"
+                        ocid="item_categories.select"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-700">
+                        Cost of Goods Sold (COGS) Account
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        The expense account charged when an item from this
+                        category is sold (records the cost of the item sold).
+                      </p>
+                      <AccountSelect
+                        value={form.cogsAccountId}
+                        onChange={(v) => setForm({ ...form, cogsAccountId: v })}
+                        options={cogsAccounts}
+                        placeholder="— Use system default —"
+                        ocid="item_categories.select"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-gray-700">
+                        Sales Revenue Account
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        The income account credited with the selling price when
+                        an item from this category is sold.
+                      </p>
+                      <AccountSelect
+                        value={form.salesAccountId}
+                        onChange={(v) =>
+                          setForm({ ...form, salesAccountId: v })
+                        }
+                        options={salesAccounts}
+                        placeholder="— Use system default —"
+                        ocid="item_categories.select"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-green-700">
-                    Sales Revenue Account
-                  </Label>
-                  <AccountSelect
-                    value={form.salesAccountId}
-                    onChange={(v) => setForm({ ...form, salesAccountId: v })}
-                    options={salesAccounts}
-                    placeholder="Use default sales revenue account"
-                    ocid="item_categories.select"
-                  />
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="space-y-2">
