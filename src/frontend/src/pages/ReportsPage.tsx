@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency, getPrefs } from "@/lib/prefs";
 import { useLocation } from "@tanstack/react-router";
 import {
   BarChart2,
@@ -31,7 +32,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -184,6 +185,14 @@ export default function ReportsPage() {
   const activeCategory = useMemo(() => {
     return new URLSearchParams(location.search).get("category") || "sales";
   }, [location.search]);
+
+  // Preferences (currency, etc.)
+  const [prefs, setPrefs] = useState(getPrefs);
+  useEffect(() => {
+    const handler = () => setPrefs(getPrefs());
+    window.addEventListener("bizpos:prefs-changed", handler);
+    return () => window.removeEventListener("bizpos:prefs-changed", handler);
+  }, []);
 
   // ---- Sales filter state ----
   const [salesListSearch, setSalesListSearch] = useState("");
@@ -688,7 +697,7 @@ export default function ReportsPage() {
               />
               <SummaryCard
                 label="Total Revenue"
-                value={`PKR ${fmt(totalAllSalesRevenue)}`}
+                value={formatCurrency(totalAllSalesRevenue, prefs.currency)}
                 color="text-green-600"
               />
               <SummaryCard
@@ -1148,7 +1157,10 @@ export default function ReportsPage() {
               />
               <SummaryCard
                 label="Total Amount"
-                value={`PKR ${fmt(store.purchases.reduce((s, p) => s + p.total, 0))}`}
+                value={formatCurrency(
+                  store.purchases.reduce((s, p) => s + p.total, 0),
+                  prefs.currency,
+                )}
                 color="text-orange-600"
               />
               <SummaryCard
@@ -1426,7 +1438,10 @@ export default function ReportsPage() {
               />
               <SummaryCard
                 label="Total Value"
-                value={`PKR ${fmt(store.items.reduce((s, i) => s + i.quantity * i.costPrice, 0))}`}
+                value={formatCurrency(
+                  store.items.reduce((s, i) => s + i.quantity * i.costPrice, 0),
+                  prefs.currency,
+                )}
                 color="text-green-600"
               />
               <SummaryCard
@@ -1748,17 +1763,26 @@ export default function ReportsPage() {
               />
               <SummaryCard
                 label="Total Gross"
-                value={`PKR ${fmt(filteredPayrolls.reduce((s, p) => s + p.totalGross, 0))}`}
+                value={formatCurrency(
+                  filteredPayrolls.reduce((s, p) => s + p.totalGross, 0),
+                  prefs.currency,
+                )}
                 color="text-blue-600"
               />
               <SummaryCard
                 label="Total Deductions"
-                value={`PKR ${fmt(filteredPayrolls.reduce((s, p) => s + p.totalDeductions, 0))}`}
+                value={formatCurrency(
+                  filteredPayrolls.reduce((s, p) => s + p.totalDeductions, 0),
+                  prefs.currency,
+                )}
                 color="text-red-600"
               />
               <SummaryCard
                 label="Total Net"
-                value={`PKR ${fmt(filteredPayrolls.reduce((s, p) => s + p.totalNet, 0))}`}
+                value={formatCurrency(
+                  filteredPayrolls.reduce((s, p) => s + p.totalNet, 0),
+                  prefs.currency,
+                )}
                 color="text-green-600"
               />
             </div>

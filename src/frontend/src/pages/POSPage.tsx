@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCurrency, getPrefs } from "@/lib/prefs";
 import {
   AlertCircle,
   Printer,
@@ -84,6 +85,14 @@ export default function POSPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
   const initialized = useRef(false);
+
+  // Preferences (currency, etc.)
+  const [prefs, setPrefs] = useState(getPrefs);
+  useEffect(() => {
+    const handler = () => setPrefs(getPrefs());
+    window.addEventListener("bizpos:prefs-changed", handler);
+    return () => window.removeEventListener("bizpos:prefs-changed", handler);
+  }, []);
 
   // Auto-apply customer group discount
   useEffect(() => {
@@ -443,10 +452,10 @@ export default function POSPage() {
                         {item.quantity}
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        {item.price.toLocaleString()}
+                        {formatCurrency(item.price, prefs.currency)}
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        {item.subtotal.toLocaleString()}
+                        {formatCurrency(item.subtotal, prefs.currency)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -456,30 +465,38 @@ export default function POSPage() {
               <div className="border-t pt-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span>{lastSale.subtotal.toLocaleString()}</span>
+                  <span>
+                    {formatCurrency(lastSale.subtotal, prefs.currency)}
+                  </span>
                 </div>
                 {lastSale.discountAmt > 0 && (
                   <div className="flex justify-between text-red-600">
                     <span>Discount</span>
-                    <span>-{lastSale.discountAmt.toLocaleString()}</span>
+                    <span>
+                      -{formatCurrency(lastSale.discountAmt, prefs.currency)}
+                    </span>
                   </div>
                 )}
                 {lastSale.promoSavings > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Promo Savings</span>
-                    <span>-{lastSale.promoSavings.toFixed(2)}</span>
+                    <span>
+                      -{formatCurrency(lastSale.promoSavings, prefs.currency)}
+                    </span>
                   </div>
                 )}
                 {lastSale.taxAmount > 0 && (
                   <div className="flex justify-between text-orange-600">
                     <span>Tax</span>
-                    <span>+{lastSale.taxAmount.toFixed(2)}</span>
+                    <span>
+                      +{formatCurrency(lastSale.taxAmount, prefs.currency)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-base border-t pt-2">
                   <span>Total</span>
                   <span className="text-primary">
-                    {lastSale.total.toLocaleString()}
+                    {formatCurrency(lastSale.total, prefs.currency)}
                   </span>
                 </div>
                 <div className="flex justify-between text-gray-600">
@@ -615,7 +632,7 @@ export default function POSPage() {
                     <div className="font-medium text-sm">{item.name}</div>
                     <div className="text-xs text-gray-500 mt-1">{item.sku}</div>
                     <div className="text-primary font-bold mt-1">
-                      {item.salePrice.toLocaleString()}
+                      {formatCurrency(item.salePrice, prefs.currency)}
                     </div>
                     <div className="text-xs text-gray-400">
                       Stock: {item.quantity}
@@ -657,7 +674,7 @@ export default function POSPage() {
                           {item.itemName}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {item.price.toLocaleString()} each
+                          {formatCurrency(item.price, prefs.currency)} each
                         </div>
                       </div>
                       <Input
@@ -687,7 +704,7 @@ export default function POSPage() {
               <div className="space-y-2 border-t pt-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span>{subtotal.toLocaleString()}</span>
+                  <span>{formatCurrency(subtotal, prefs.currency)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600 whitespace-nowrap">
@@ -725,24 +742,28 @@ export default function POSPage() {
                 {promoSavings > 0 && (
                   <div className="flex justify-between text-sm text-green-700">
                     <span>Promo Savings:</span>
-                    <span>-{promoSavings.toFixed(2)}</span>
+                    <span>-{formatCurrency(promoSavings, prefs.currency)}</span>
                   </div>
                 )}
                 {taxAmount > 0 && (
                   <>
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>Taxable Amount:</span>
-                      <span>{taxableAmount.toFixed(2)}</span>
+                      <span>
+                        {formatCurrency(taxableAmount, prefs.currency)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm text-orange-600">
                       <span>Tax:</span>
-                      <span>+{taxAmount.toFixed(2)}</span>
+                      <span>+{formatCurrency(taxAmount, prefs.currency)}</span>
                     </div>
                   </>
                 )}
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
                   <span>Total:</span>
-                  <span className="text-primary">{total.toLocaleString()}</span>
+                  <span className="text-primary">
+                    {formatCurrency(total, prefs.currency)}
+                  </span>
                 </div>
               </div>
               <Button

@@ -1,35 +1,60 @@
 # BizPOS System
 
 ## Current State
-The top bar has the company name pill, user name + role displayed as text, and a standalone logout icon button. The sidebar bottom has a dedicated logout button (icon + text when expanded). The `?` keyboard shortcut is supposed to toggle the shortcuts panel but it's broken — the `KeyboardShortcuts` component manages its own `open` state but the `?` key handler inside that same component uses a keydown listener on `window`, so if the modal is open, pressing `?` may not reach the handler correctly because the modal overlay captures events.
+- Preferences (compact tables, tooltips, notifications, date format, currency) are saved to `bizpos_user_prefs` in localStorage but **not applied** anywhere in the app. They are purely cosmetic.
+- The Edit Profile modal shows initials-based avatar with no option to upload a photo.
+- POS page has currency amounts hardcoded as plain numbers with `.toLocaleString()` — no currency symbol prepended.
+- ReportsPage hardcodes `PKR` as the currency prefix in all KPI cards and table cells.
+- `NotificationBell` in AppLayout always shows all notifications regardless of user preferences.
+- No shared `formatDate` or `formatCurrency` utility exists — each page formats independently.
 
 ## Requested Changes (Diff)
 
 ### Add
-- A circular user avatar/icon button in the top bar (rightmost, replacing the standalone logout button and the username text block)
-- A dropdown panel that opens below the avatar button when clicked, showing:
-  - User avatar (initials circle, large)
-  - User full name
-  - Role name (with Super badge if superUser)
-  - A visual divider
-  - Logout button/link (full width, red styled)
-- A `UserProfileDropdown` component (inside AppLayout.tsx)
+- `src/frontend/src/lib/prefs.ts` — shared utility module with:
+  - `getPrefs()` — reads `bizpos_user_prefs` from localStorage, returns defaults if not set
+  - `formatCurrency(amount, currency?)` — returns formatted string with correct symbol (PKR, USD, EUR, GBP, AED, SAR)
+  - `formatDate(date, dateFormat?)` — formats a Date or ISO string per the user's date format preference (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
+- Profile photo upload to Edit Profile modal: file input (accept image/*), preview the selected image as a circular avatar, store base64 in `bizpos_user_photo_{userId}` in localStorage, display the photo everywhere the initials avatar is shown (profile dropdown avatar, Edit Profile modal header)
 
 ### Modify
-- Remove the username + role text block (`nav.user.panel`) from the desktop top bar — it moves into the dropdown
-- Remove the logout icon button from the desktop top bar — it moves into the dropdown
-- Remove the logout button entirely from the sidebar bottom — the sidebar bottom div should be removed or just left empty / removed
-- Fix `?` shortcut: the issue is that the `?` key listener fires `setOpen(prev => !prev)` but the modal overlay has a `tabIndex=-1` and captures events. The fix is to ensure the keydown handler checks if the modal is already open and if `?` is pressed, it closes regardless. Also make sure the handler is not accidentally blocked. A reliable fix: move the `?` toggle to use a `useEffect` that explicitly checks `open` state via a ref so stale closures don't cause issues.
-- On mobile top bar: also replace the user section with just the avatar icon (no text)
+- **`AppLayout.tsx` — PreferencesContext/propagation:**
+  - After `savePrefs()`, dispatch a custom DOM event `bizpos:prefs-changed` so other components can reactively re-read preferences without a full page reload.
+  - `ProfileDropdown` component: show photo if available, else initials. Add photo upload UI in the Edit Profile modal.
+  - `NotificationBell`: read prefs from localStorage and filter notifications based on `notifLowStock`, `notifPendingApprovals`, `notifSales` flags.
+  - When `savePrefs` is called, apply `compact` class to `document.body` (or a data attribute `data-compact="true"`) so CSS can target table rows globally — avoids needing to touch every page.
+
+- **Global CSS (`index.css`):**
+  - Add rule: `body[data-compact='true'] table tbody tr td, body[data-compact='true'] table tbody tr th { padding-top: 0.25rem; padding-bottom: 0.25rem; font-size: 0.75rem; }` to implement compact table mode globally without touching each page.
+  - Add rule for tooltips: `body[data-tooltips='false'] [data-tooltip], body[data-tooltips='false'] [title] { pointer-events: auto; }` — and hide tooltip content elements with class `tooltip-hint` when tooltips are off.
+
+- **`AppLayout.tsx` — apply data attributes on mount and on pref change:**
+  - On mount, read prefs and set `document.body.dataset.compact` and `document.body.dataset.tooltips` from stored prefs.
+  - After `savePrefs()`, update these data attributes immediately so compact/tooltip changes are instant.
+
+- **`POSPage.tsx`:**
+  - Import `formatCurrency` and `getPrefs` from `@/lib/prefs`.
+  - Replace all `.toLocaleString()` and `.toFixed(2)` currency displays with `formatCurrency(value, prefs.currency)`.
+  - This covers: item price column, subtotal, discount, promo savings, tax, total in cart, and the receipt modal.
+
+- **`ReportsPage.tsx`:**
+  - Import `formatCurrency` and `getPrefs` from `@/lib/prefs`.
+  - Replace hardcoded `PKR ${fmt(...)}` strings with `formatCurrency(value, prefs.currency)`.
+  - Replace hardcoded `fmt()` in KPI cards across Sales, Purchase, Inventory, Payroll report tabs.
+  - The `fmt` helper at top of file should be replaced/supplemented by the shared utility.
 
 ### Remove
-- Sidebar bottom logout button and its containing div
-- Username/role text block in desktop top bar
-- Standalone logout button in desktop top bar
+- Nothing removed, only additions and targeted edits.
 
 ## Implementation Plan
-1. Add `UserProfileDropdown` component to AppLayout.tsx that renders a circular avatar button with user initials, and a dropdown containing full name, role, Super badge, divider, and logout action
-2. Replace the `{/* User name + role */}` and `{/* Logout button */}` blocks in the desktop topbar with `<UserProfileDropdown />`
-3. Remove the sidebar bottom section that contains the logout button
-4. Fix the `?` shortcut by using a `openRef` in `KeyboardShortcuts` that stays in sync with `open` state, so the keydown handler reads from the ref instead of closing over stale state
-5. Validate and deploy
+
+1. Create `src/frontend/src/lib/prefs.ts` with `getPrefs()`, `formatCurrency()`, `formatDate()` exports.
+2. Update `index.css` to add global compact-table and tooltip CSS rules using data attributes.
+3. Update `AppLayout.tsx`:
+   a. On mount, apply data attributes to body from saved prefs.
+   b. After `savePrefs()`, update body data attributes immediately and dispatch `bizpos:prefs-changed` event.
+   c. In `NotificationBell`, filter notifications by pref flags.
+   d. In Edit Profile modal, replace initials avatar with photo upload: file input, base64 preview, save to `bizpos_user_photo_{id}`, display photo if available.
+   e. In profile dropdown avatar circle, show photo img if available.
+4. Update `POSPage.tsx`: use `formatCurrency` for all monetary displays; re-read prefs on component mount (listen to `bizpos:prefs-changed` event to re-render).
+5. Update `ReportsPage.tsx`: use `formatCurrency` for all PKR-prefixed monetary KPI cards and table values; listen to `bizpos:prefs-changed` for reactivity.

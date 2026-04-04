@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getPrefs } from "@/lib/prefs";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Award,
@@ -710,6 +711,7 @@ function FavoritesButton({
 
 function NotificationBell() {
   const navigate = useNavigate();
+  const prefs = getPrefs();
 
   const notifications: {
     id: string;
@@ -723,31 +725,35 @@ function NotificationBell() {
         localStorage.getItem("bizpos_purchase_requisitions") || "[]",
       );
 
-      const lowStock = items
-        .filter(
-          (i: { quantity: number; reorderLevel?: number; name: string }) =>
-            i.reorderLevel && i.quantity <= i.reorderLevel,
-        )
-        .slice(0, 5)
-        .map((i: { name: string }) => ({
-          id: `ls-${i.name}`,
-          message: `Low stock: ${i.name}`,
-          path: "/items",
-          type: "warning",
-        }));
+      const lowStock = prefs.notifLowStock
+        ? items
+            .filter(
+              (i: { quantity: number; reorderLevel?: number; name: string }) =>
+                i.reorderLevel && i.quantity <= i.reorderLevel,
+            )
+            .slice(0, 5)
+            .map((i: { name: string }) => ({
+              id: `ls-${i.name}`,
+              message: `Low stock: ${i.name}`,
+              path: "/items",
+              type: "warning",
+            }))
+        : [];
 
-      const pendingReqs = reqs
-        .filter(
-          (r: { status: string; requisitionNo: string }) =>
-            r.status === "Submitted",
-        )
-        .slice(0, 5)
-        .map((r: { id: string; requisitionNo: string }) => ({
-          id: `req-${r.id}`,
-          message: `Pending approval: ${r.requisitionNo}`,
-          path: "/purchase-requisitions",
-          type: "info",
-        }));
+      const pendingReqs = prefs.notifPendingApprovals
+        ? reqs
+            .filter(
+              (r: { status: string; requisitionNo: string }) =>
+                r.status === "Submitted",
+            )
+            .slice(0, 5)
+            .map((r: { id: string; requisitionNo: string }) => ({
+              id: `req-${r.id}`,
+              message: `Pending approval: ${r.requisitionNo}`,
+              path: "/purchase-requisitions",
+              type: "info",
+            }))
+        : [];
 
       return [...lowStock, ...pendingReqs];
     } catch {
@@ -1050,7 +1056,37 @@ function UserProfileDropdown({
   navigate: (opts: { to: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [modal, setModal] = useState<
+    null | "profile" | "password" | "preferences" | "activity"
+  >(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Profile photo state
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(() => {
+    if (!currentUser?.id) return null;
+    return localStorage.getItem(`bizpos_user_photo_${currentUser.id}`) || null;
+  });
+
+  // Edit Profile form state
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    jobTitle: "",
+    department: "",
+    bio: "",
+  });
+
+  // Change Password form state
+  const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
+  const [pwVisible, setPwVisible] = useState({
+    current: false,
+    newPw: false,
+    confirm: false,
+  });
+
+  // Preferences state
+  const [prefs, setPrefs] = useState(() => getPrefs());
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1065,67 +1101,898 @@ function UserProfileDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const openModal = (
+    type: "profile" | "password" | "preferences" | "activity",
+  ) => {
+    setOpen(false);
+    if (type === "profile") {
+      // Load current user data
+      const users = JSON.parse(localStorage.getItem("bizpos_users") || "[]");
+      const user = users.find((u: any) => u.id === currentUser?.id);
+      setProfileForm({
+        name: user?.name || currentUser?.name || "",
+        email: user?.email || currentUser?.email || "",
+        phone: user?.phone || "",
+        jobTitle: user?.jobTitle || "",
+        department: user?.department || "",
+        bio: user?.bio || "",
+      });
+    }
+    if (type === "password") {
+      setPwForm({ current: "", newPw: "", confirm: "" });
+      setPwVisible({ current: false, newPw: false, confirm: false });
+    }
+    if (type === "activity") {
+      // nothing to pre-load
+    }
+    setModal(type);
+  };
+
+  const saveProfile = () => {
+    if (!profileForm.name.trim()) {
+      alert("Name is required");
+      return;
+    }
+    if (!profileForm.email.trim()) {
+      alert("Email is required");
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem("bizpos_users") || "[]");
+    const updated = users.map((u: any) =>
+      u.id === currentUser?.id ? { ...u, ...profileForm } : u,
+    );
+    localStorage.setItem("bizpos_users", JSON.stringify(updated));
+    // Update session
+    const session = JSON.parse(
+      localStorage.getItem("bizpos_session") || "null",
+    );
+    if (session) {
+      localStorage.setItem(
+        "bizpos_session",
+        JSON.stringify({
+          ...session,
+          name: profileForm.name,
+          email: profileForm.email,
+        }),
+      );
+    }
+    setModal(null);
+    alert("Profile updated successfully. Please refresh to see changes.");
+  };
+
+  const savePassword = () => {
+    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) {
+      alert("All fields are required");
+      return;
+    }
+    if (pwForm.newPw.length < 4) {
+      alert("New password must be at least 4 characters");
+      return;
+    }
+    if (pwForm.newPw !== pwForm.confirm) {
+      alert("Passwords do not match");
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem("bizpos_users") || "[]");
+    const user = users.find((u: any) => u.id === currentUser?.id);
+    if (!user) {
+      alert("User not found");
+      return;
+    }
+    if (user.password !== pwForm.current) {
+      alert("Current password is incorrect");
+      return;
+    }
+    const updated = users.map((u: any) =>
+      u.id === currentUser?.id ? { ...u, password: pwForm.newPw } : u,
+    );
+    localStorage.setItem("bizpos_users", JSON.stringify(updated));
+    setModal(null);
+    alert("Password changed successfully.");
+  };
+
+  const savePrefs = () => {
+    localStorage.setItem("bizpos_user_prefs", JSON.stringify(prefs));
+    // Apply immediately
+    document.body.dataset.compact = String(!!prefs.compactTables);
+    document.body.dataset.tooltips = String(prefs.showTooltips !== false);
+    // Notify other components
+    window.dispatchEvent(new CustomEvent("bizpos:prefs-changed"));
+    setModal(null);
+  };
+
   const initials = getInitials(currentUser?.name ?? "");
 
-  return (
-    <div className="relative" ref={wrapperRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-        title={currentUser?.name ?? "Profile"}
-        data-ocid="nav.user.open_modal_button"
-      >
-        {initials}
-      </button>
+  // Activity log entries
+  const activityLogs = (() => {
+    try {
+      const logs = JSON.parse(localStorage.getItem("bizpos_logs") || "[]");
+      return logs.filter((l: any) => l.userId === currentUser?.id).slice(0, 20);
+    } catch {
+      return [];
+    }
+  })();
 
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-2 z-50 min-w-[220px] bg-white border border-slate-200 rounded-xl shadow-xl py-3"
-          data-ocid="nav.user.panel"
+  return (
+    <>
+      <div className="relative" ref={wrapperRef}>
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 overflow-hidden"
+          title={currentUser?.name ?? "Profile"}
+          data-ocid="nav.user.open_modal_button"
         >
-          {/* Avatar + name */}
-          <div className="flex flex-col items-center px-4 pb-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 text-white text-lg font-bold mb-2">
-              {initials}
+          {profilePhoto ? (
+            <img
+              src={profilePhoto}
+              alt={currentUser?.name ?? ""}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            initials
+          )}
+        </button>
+
+        {open && (
+          <div
+            className="absolute right-0 top-full mt-2 z-50 min-w-[240px] bg-white border border-slate-200 rounded-xl shadow-xl py-2"
+            data-ocid="nav.user.panel"
+          >
+            {/* Avatar + info */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="flex items-center justify-center w-11 h-11 rounded-full bg-blue-600 text-white text-base font-bold flex-shrink-0 overflow-hidden">
+                {profilePhoto ? (
+                  <img
+                    src={profilePhoto}
+                    alt={currentUser?.name ?? ""}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">
+                  {currentUser?.name}
+                </p>
+                <p className="text-xs text-slate-500 truncate">
+                  {currentUser?.email}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-xs text-slate-400">
+                    {currentUser?.roleName}
+                  </span>
+                  {currentUser?.isSuperUser && (
+                    <Badge className="text-[10px] px-1 py-0 bg-purple-600 text-white border-0">
+                      Super
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
-            <p className="text-sm font-semibold text-slate-800 text-center">
-              {currentUser?.name}
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-xs text-slate-400">
-                {currentUser?.roleName}
-              </span>
-              {currentUser?.isSuperUser && (
-                <Badge className="text-[10px] px-1 py-0 bg-purple-600 text-white border-0">
-                  Super
-                </Badge>
-              )}
+
+            <div className="border-t border-slate-100 mx-2 my-1" />
+
+            {/* Account section */}
+            <div className="px-2">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 py-1">
+                Account
+              </p>
+              <button
+                type="button"
+                onClick={() => openModal("profile")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 text-sm transition-colors"
+              >
+                <UserCircle className="h-4 w-4 text-slate-400" />
+                Edit Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => openModal("password")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 text-sm transition-colors"
+              >
+                <Shield className="h-4 w-4 text-slate-400" />
+                Change Password
+              </button>
+              <button
+                type="button"
+                onClick={() => openModal("preferences")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 text-sm transition-colors"
+              >
+                <Settings className="h-4 w-4 text-slate-400" />
+                Preferences
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 mx-2 my-1" />
+
+            {/* Activity & Navigation */}
+            <div className="px-2">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 py-1">
+                Quick Links
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  navigate({ to: "/settings" });
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 text-sm transition-colors"
+              >
+                <Settings className="h-4 w-4 text-slate-400" />
+                System Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => openModal("activity")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 text-sm transition-colors"
+              >
+                <History className="h-4 w-4 text-slate-400" />
+                My Activity
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 mx-2 my-1" />
+
+            {/* Logout */}
+            <div className="px-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  logout();
+                  navigate({ to: "/" });
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 text-sm font-medium transition-colors"
+                data-ocid="nav.logout.button"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </button>
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Divider */}
-          <div className="border-t border-slate-100 my-1" />
+      {/* ── Edit Profile Modal ── */}
+      {modal === "profile" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Edit Profile
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Update your personal information
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Avatar display + photo upload */}
+              <div className="flex items-center gap-4 pb-2">
+                <div className="relative flex-shrink-0">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 text-white text-xl font-bold overflow-hidden">
+                    {profilePhoto ? (
+                      <img
+                        src={profilePhoto}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      getInitials(profileForm.name || currentUser?.name || "")
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-700">
+                    Profile Photo
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label
+                      className="cursor-pointer px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                      data-ocid="profile.upload_button"
+                    >
+                      Upload Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const dataUrl = ev.target?.result as string;
+                            if (currentUser?.id) {
+                              localStorage.setItem(
+                                `bizpos_user_photo_${currentUser.id}`,
+                                dataUrl,
+                              );
+                            }
+                            setProfilePhoto(dataUrl);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {profilePhoto && (
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        onClick={() => {
+                          if (currentUser?.id) {
+                            localStorage.removeItem(
+                              `bizpos_user_photo_${currentUser.id}`,
+                            );
+                          }
+                          setProfilePhoto(null);
+                        }}
+                        data-ocid="profile.delete_button"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    JPG, PNG or GIF. Max visible size 64×64px.
+                  </p>
+                </div>
+              </div>
 
-          {/* Logout */}
-          <div className="px-2">
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                logout();
-                navigate({ to: "/" });
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
-              data-ocid="nav.logout.button"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 sm:col-span-1">
+                  <label
+                    htmlFor="upd_field_1"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, name: e.target.value }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label
+                    htmlFor="upd_field_2"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="john@example.com"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label
+                    htmlFor="upd_field_3"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={profileForm.phone}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, phone: e.target.value }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="+1 234 567 8900"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label
+                    htmlFor="upd_field_4"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Job Title
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.jobTitle}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({
+                        ...f,
+                        jobTitle: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Sales Manager"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label
+                    htmlFor="upd_field_5"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    value={profileForm.department}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({
+                        ...f,
+                        department: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Operations"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label
+                    htmlFor="upd_field_6"
+                    className="block text-sm font-medium text-slate-700 mb-1"
+                  >
+                    Bio / Notes
+                  </label>
+                  <textarea
+                    value={profileForm.bio}
+                    rows={3}
+                    onChange={(e) =>
+                      setProfileForm((f) => ({ ...f, bio: e.target.value }))
+                    }
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="Short bio or notes about yourself..."
+                  />
+                </div>
+              </div>
+
+              {/* Read-only info */}
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Account Info (Read-only)
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-slate-500">Role:</span>{" "}
+                    <span className="font-medium text-slate-700">
+                      {currentUser?.roleName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Account Type:</span>{" "}
+                    <span className="font-medium text-slate-700">
+                      {currentUser?.isSuperUser
+                        ? "Super User"
+                        : "Standard User"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveProfile}
+                className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+
+      {/* ── Change Password Modal ── */}
+      {modal === "password" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Change Password
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Choose a strong new password
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Password strength tips */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
+                <p className="font-semibold">Password requirements:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>Minimum 4 characters</li>
+                  <li>
+                    Use a mix of letters, numbers, and symbols for best security
+                  </li>
+                </ul>
+              </div>
+
+              {(["current", "newPw", "confirm"] as const).map((field) => {
+                const labels = {
+                  current: "Current Password",
+                  newPw: "New Password",
+                  confirm: "Confirm New Password",
+                };
+                return (
+                  <div key={field}>
+                    <label
+                      htmlFor="upd_field_7"
+                      className="block text-sm font-medium text-slate-700 mb-1"
+                    >
+                      {labels[field]}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={pwVisible[field] ? "text" : "password"}
+                        value={pwForm[field]}
+                        onChange={(e) =>
+                          setPwForm((f) => ({ ...f, [field]: e.target.value }))
+                        }
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={labels[field]}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPwVisible((v) => ({ ...v, [field]: !v[field] }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                      >
+                        {pwVisible[field] ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {pwForm.newPw &&
+                pwForm.confirm &&
+                pwForm.newPw !== pwForm.confirm && (
+                  <p className="text-xs text-red-500">Passwords do not match</p>
+                )}
+              {pwForm.newPw &&
+                pwForm.newPw === pwForm.confirm &&
+                pwForm.confirm && (
+                  <p className="text-xs text-green-600">Passwords match ✓</p>
+                )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={savePassword}
+                className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium transition-colors"
+              >
+                Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Preferences Modal ── */}
+      {modal === "preferences" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Preferences
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Customize your experience
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Display */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                  Display
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">
+                        Compact Tables
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Reduce row height in data tables
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPrefs((p: any) => ({
+                          ...p,
+                          compactTables: !p.compactTables,
+                        }))
+                      }
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${prefs.compactTables ? "bg-blue-600" : "bg-slate-200"}`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${prefs.compactTables ? "translate-x-4" : "translate-x-1"}`}
+                      />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">
+                        Show Tooltips
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Display helpful hints on hover
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPrefs((p: any) => ({
+                          ...p,
+                          showTooltips: !p.showTooltips,
+                        }))
+                      }
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${prefs.showTooltips !== false ? "bg-blue-600" : "bg-slate-200"}`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${prefs.showTooltips !== false ? "translate-x-4" : "translate-x-1"}`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100" />
+
+              {/* Notifications */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                  Notifications
+                </p>
+                <div className="space-y-3">
+                  {[
+                    {
+                      key: "notifLowStock",
+                      label: "Low Stock Alerts",
+                      desc: "Get notified when items fall below reorder level",
+                    },
+                    {
+                      key: "notifPendingApprovals",
+                      label: "Pending Approvals",
+                      desc: "Requisitions and orders awaiting your action",
+                    },
+                    {
+                      key: "notifSales",
+                      label: "New Sales",
+                      desc: "Notify on each completed sale",
+                    },
+                  ].map(({ key, label, desc }) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">
+                          {label}
+                        </p>
+                        <p className="text-xs text-slate-400">{desc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPrefs((p: any) => ({ ...p, [key]: !p[key] }))
+                        }
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${prefs[key] !== false ? "bg-blue-600" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${prefs[key] !== false ? "translate-x-4" : "translate-x-1"}`}
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100" />
+
+              {/* Date & Number Format */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                  Regional
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="upd_field_8"
+                      className="block text-sm font-medium text-slate-700 mb-1"
+                    >
+                      Date Format
+                    </label>
+                    <select
+                      value={prefs.dateFormat || "DD/MM/YYYY"}
+                      onChange={(e) =>
+                        setPrefs((p: any) => ({
+                          ...p,
+                          dateFormat: e.target.value,
+                        }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="upd_field_9"
+                      className="block text-sm font-medium text-slate-700 mb-1"
+                    >
+                      Currency Symbol
+                    </label>
+                    <select
+                      value={prefs.currency || "PKR"}
+                      onChange={(e) =>
+                        setPrefs((p: any) => ({
+                          ...p,
+                          currency: e.target.value,
+                        }))
+                      }
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="PKR">PKR — Pakistani Rupee</option>
+                      <option value="USD">USD — US Dollar</option>
+                      <option value="EUR">EUR — Euro</option>
+                      <option value="GBP">GBP — British Pound</option>
+                      <option value="AED">AED — UAE Dirham</option>
+                      <option value="SAR">SAR — Saudi Riyal</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={savePrefs}
+                className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium transition-colors"
+              >
+                Save Preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── My Activity Modal ── */}
+      {modal === "activity" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  My Activity
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Recent actions in your account
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {activityLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">
+                    No activity recorded yet
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activityLogs.map((log: any, idx: number) => (
+                    <div
+                      key={log.id || log.timestamp || idx}
+                      className="flex items-start gap-3 pb-3 border-b border-slate-50 last:border-0"
+                    >
+                      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center mt-0.5">
+                        <History className="h-3.5 w-3.5 text-blue-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-700 truncate">
+                          {log.action || "Action"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {log.module || ""}{" "}
+                          {log.details ? `— ${log.details}` : ""}
+                        </p>
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          {log.timestamp
+                            ? new Date(log.timestamp).toLocaleString()
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setModal(null);
+                  navigate({ to: "/logs" });
+                }}
+                className="text-sm text-blue-600 hover:underline font-medium"
+              >
+                View full audit log →
+              </button>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1156,6 +2023,18 @@ export default function AppLayout() {
     return () => {
       if (flyoutTimeoutRef.current) clearTimeout(flyoutTimeoutRef.current);
     };
+  }, []);
+
+  // Apply preferences on mount and when they change
+  useEffect(() => {
+    const applyPrefs = () => {
+      const p = getPrefs();
+      document.body.dataset.compact = String(p.compactTables);
+      document.body.dataset.tooltips = String(p.showTooltips);
+    };
+    applyPrefs();
+    window.addEventListener("bizpos:prefs-changed", applyPrefs);
+    return () => window.removeEventListener("bizpos:prefs-changed", applyPrefs);
   }, []);
 
   const handleGroupHover = (

@@ -81,3 +81,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Compact tables — applied globally via data attribute */
+body[data-compact="true"] table tbody tr td,
+body[data-compact="true"] table tbody tr th {
+  padding-top: 0.2rem !important;
+  padding-bottom: 0.2rem !important;
+  font-size: 0.75rem !important;
+}
+
+/* Tooltips off — hide title-based tooltip popups */
+body[data-tooltips="false"] [title] {
+  pointer-events: auto;
+}
