@@ -23,13 +23,18 @@ import ChequePrintPage from "./pages/ChequePrintPage";
 import ChequeTemplatesPage from "./pages/ChequeTemplatesPage";
 import CompaniesPage from "./pages/CompaniesPage";
 import CompanySelectPage from "./pages/CompanySelectPage";
+import CreditNotesPage from "./pages/CreditNotesPage";
+import CustomerGroupsPage from "./pages/CustomerGroupsPage";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
+import DebitNotesPage from "./pages/DebitNotesPage";
 import DepartmentsPage from "./pages/DepartmentsPage";
 import DesignationsPage from "./pages/DesignationsPage";
 import DiscountsPage from "./pages/DiscountsPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import ExpenseCategoriesPage from "./pages/ExpenseCategoriesPage";
 import ExpensesPage from "./pages/ExpensesPage";
+import FinancialYearsPage from "./pages/FinancialYearsPage";
 import GoodsReceiptPage from "./pages/GoodsReceiptPage";
 import InventoryTransfersPage from "./pages/InventoryTransfersPage";
 import ItemsPage from "./pages/ItemsPage";
@@ -37,6 +42,7 @@ import JournalEntriesPage from "./pages/JournalEntriesPage";
 import LeaveManagementPage from "./pages/LeaveManagementPage";
 import LoginPage from "./pages/LoginPage";
 import LogsPage from "./pages/LogsPage";
+import OpeningBalancesPage from "./pages/OpeningBalancesPage";
 import POSPage from "./pages/POSPage";
 import PaymentHistoryPage from "./pages/PaymentHistoryPage";
 import PaymentModesPage from "./pages/PaymentModesPage";
@@ -44,6 +50,7 @@ import ProfitLossPage from "./pages/ProfitLossPage";
 import PromotionsPage from "./pages/PromotionsPage";
 import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import PurchaseRequisitionsPage from "./pages/PurchaseRequisitionsPage";
+import PurchaseReturnsPage from "./pages/PurchaseReturnsPage";
 import PurchasesPage from "./pages/PurchasesPage";
 import ReceivePaymentPage from "./pages/ReceivePaymentPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -52,6 +59,7 @@ import SalaryProcessingPage from "./pages/SalaryProcessingPage";
 import SalarySlipsPage from "./pages/SalarySlipsPage";
 import SaleDetailPage from "./pages/SaleDetailPage";
 import SalesListPage from "./pages/SalesListPage";
+import SalesReturnsPage from "./pages/SalesReturnsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ShiftClosingPage from "./pages/ShiftClosingPage";
 import ShiftsPage from "./pages/ShiftsPage";
@@ -67,6 +75,287 @@ import UsersPage from "./pages/UsersPage";
 import WarehouseSelectPage from "./pages/WarehouseSelectPage";
 import WarehouseStockPage from "./pages/WarehouseStockPage";
 import WarehousesPage from "./pages/WarehousesPage";
+
+// Ensure v9 seed data exists
+(function ensureV9Seed() {
+  if (localStorage.getItem("bizpos_seeded_v9")) return;
+
+  // Financial Years
+  if (!localStorage.getItem("bizpos_financial_years")) {
+    localStorage.setItem(
+      "bizpos_financial_years",
+      JSON.stringify([
+        {
+          id: "fy1",
+          name: "FY 2025-26",
+          startDate: "2025-04-01",
+          endDate: "2026-03-31",
+          isCurrent: true,
+          status: "Open",
+        },
+      ]),
+    );
+  }
+
+  // Customer Groups
+  if (!localStorage.getItem("bizpos_customer_groups")) {
+    localStorage.setItem(
+      "bizpos_customer_groups",
+      JSON.stringify([
+        {
+          id: "cg1",
+          name: "Retail",
+          description: "Standard retail customers",
+          discount: 0,
+          status: "Active",
+        },
+        {
+          id: "cg2",
+          name: "Wholesale",
+          description: "Wholesale buyers with volume discounts",
+          discount: 5,
+          status: "Active",
+        },
+        {
+          id: "cg3",
+          name: "VIP",
+          description: "VIP customers with premium discounts",
+          discount: 10,
+          status: "Active",
+        },
+        {
+          id: "cg4",
+          name: "Corporate",
+          description: "Corporate accounts",
+          discount: 8,
+          status: "Active",
+        },
+      ]),
+    );
+  }
+
+  // Expense Categories
+  if (!localStorage.getItem("bizpos_expense_categories")) {
+    localStorage.setItem(
+      "bizpos_expense_categories",
+      JSON.stringify([
+        {
+          id: "ec1",
+          name: "Utilities",
+          description: "Electricity, water, internet",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+        {
+          id: "ec2",
+          name: "Rent",
+          description: "Office and warehouse rent",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+        {
+          id: "ec3",
+          name: "Transport",
+          description: "Transport and logistics costs",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+        {
+          id: "ec4",
+          name: "Office Supplies",
+          description: "Stationery and office items",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+        {
+          id: "ec5",
+          name: "Marketing",
+          description: "Advertising and promotions",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+        {
+          id: "ec6",
+          name: "Maintenance",
+          description: "Equipment and facility maintenance",
+          accountId: "",
+          accountName: "",
+          status: "Active",
+        },
+      ]),
+    );
+  }
+
+  // Sample Expenses (enhanced with category)
+  const existingExpenses = JSON.parse(
+    localStorage.getItem("bizpos_expenses") || "[]",
+  );
+  if (existingExpenses.length < 3) {
+    localStorage.setItem(
+      "bizpos_expenses",
+      JSON.stringify([
+        ...existingExpenses,
+        {
+          id: "exp-v9-1",
+          accountId: "",
+          accountName: "General Expense",
+          categoryId: "ec1",
+          categoryName: "Utilities",
+          amount: 15000,
+          description: "Monthly electricity bill",
+          date: "2026-03-01",
+          paymentMethod: "Bank",
+          reference: "UTIL-001",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "exp-v9-2",
+          accountId: "",
+          accountName: "General Expense",
+          categoryId: "ec2",
+          categoryName: "Rent",
+          amount: 50000,
+          description: "Office rent - March 2026",
+          date: "2026-03-05",
+          paymentMethod: "Cheque",
+          reference: "RENT-003",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "exp-v9-3",
+          accountId: "",
+          accountName: "General Expense",
+          categoryId: "ec3",
+          categoryName: "Transport",
+          amount: 8500,
+          description: "Delivery charges for warehouse",
+          date: "2026-03-10",
+          paymentMethod: "Cash",
+          reference: "TRN-012",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+        },
+      ]),
+    );
+  }
+
+  // Sample Credit Notes
+  if (!localStorage.getItem("bizpos_credit_notes")) {
+    localStorage.setItem(
+      "bizpos_credit_notes",
+      JSON.stringify([
+        {
+          id: "cn-001",
+          noteNumber: "CN-2026-001",
+          customerId: "",
+          customerName: "Walk-in Customer",
+          saleRef: "SALE-2026-001",
+          date: "2026-03-15",
+          items: [
+            {
+              itemId: "",
+              itemName: "Samsung Galaxy S24",
+              qty: 1,
+              price: 185000,
+              subtotal: 185000,
+            },
+          ],
+          totalAmount: 185000,
+          reason: "Customer received defective unit",
+          status: "Posted",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+          modifiedBy: "System Admin",
+          modifiedAt: new Date().toISOString(),
+        },
+        {
+          id: "cn-002",
+          noteNumber: "CN-2026-002",
+          customerId: "",
+          customerName: "Ahmed Khan",
+          saleRef: "SALE-2026-003",
+          date: "2026-03-20",
+          items: [
+            {
+              itemId: "",
+              itemName: "Office Chair",
+              qty: 2,
+              price: 5000,
+              subtotal: 10000,
+            },
+          ],
+          totalAmount: 10000,
+          reason: "Wrong color delivered",
+          status: "Draft",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+          modifiedBy: "System Admin",
+          modifiedAt: new Date().toISOString(),
+        },
+      ]),
+    );
+  }
+
+  // Sample Debit Notes
+  if (!localStorage.getItem("bizpos_debit_notes")) {
+    localStorage.setItem(
+      "bizpos_debit_notes",
+      JSON.stringify([
+        {
+          id: "dn-001",
+          noteNumber: "DN-2026-001",
+          supplierId: "",
+          supplierName: "Tech Supplies Co.",
+          purchaseRef: "PO-2026-001",
+          date: "2026-03-16",
+          items: [
+            {
+              itemId: "",
+              itemName: "Laptop Dell XPS",
+              qty: 1,
+              price: 150000,
+              subtotal: 150000,
+            },
+          ],
+          totalAmount: 150000,
+          reason: "Damaged in transit",
+          status: "Posted",
+          createdBy: "System Admin",
+          createdAt: new Date().toISOString(),
+          modifiedBy: "System Admin",
+          modifiedAt: new Date().toISOString(),
+        },
+      ]),
+    );
+  }
+
+  // Opening Balances (empty by default)
+  if (!localStorage.getItem("bizpos_opening_balances")) {
+    localStorage.setItem("bizpos_opening_balances", JSON.stringify([]));
+  }
+
+  // Update items with reorderLevel and reorderQty if not set
+  try {
+    const items = JSON.parse(localStorage.getItem("bizpos_items") || "[]");
+    const updatedItems = items.map((item: Record<string, unknown>) => ({
+      ...item,
+      reorderLevel: item.reorderLevel ?? 10,
+      reorderQty: item.reorderQty ?? 50,
+    }));
+    localStorage.setItem("bizpos_items", JSON.stringify(updatedItems));
+  } catch {
+    /* ignore */
+  }
+
+  localStorage.setItem("bizpos_seeded_v9", "true");
+})();
 
 function isLoggedIn() {
   return !!localStorage.getItem("bizpos_session");
@@ -87,7 +376,6 @@ const loginRoute = createRoute({
           throw redirect({ to: "/company-select" });
         }
       } catch (e) {
-        // If redirect was thrown, rethrow it
         if (e && typeof e === "object" && "href" in (e as object)) throw e;
       }
       throw redirect({ to: "/dashboard" });
@@ -123,7 +411,6 @@ const companiesRoute = createRoute({
   path: "/companies",
   component: CompaniesPage,
 });
-
 const dashboardRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/dashboard",
@@ -209,6 +496,11 @@ const expensesRoute = createRoute({
   path: "/expenses",
   component: ExpensesPage,
 });
+const expenseCategoriesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/expense-categories",
+  component: ExpenseCategoriesPage,
+});
 const trialBalanceRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/trial-balance",
@@ -264,7 +556,6 @@ const settingsRoute = createRoute({
   path: "/settings",
   component: SettingsPage,
 });
-
 const customersRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/customers",
@@ -295,7 +586,6 @@ const promotionsRoute = createRoute({
   path: "/promotions",
   component: PromotionsPage,
 });
-
 const purchaseRequisitionsRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/purchase-requisitions",
@@ -321,7 +611,6 @@ const supplierPerformanceRoute = createRoute({
   path: "/supplier-performance",
   component: SupplierPerformancePage,
 });
-
 const departmentsRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/departments",
@@ -393,6 +682,43 @@ const chequePrintRoute = createRoute({
   component: ChequePrintPage,
 });
 
+// New routes
+const creditNotesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/credit-notes",
+  component: CreditNotesPage,
+});
+const debitNotesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/debit-notes",
+  component: DebitNotesPage,
+});
+const openingBalancesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/opening-balances",
+  component: OpeningBalancesPage,
+});
+const financialYearsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/financial-years",
+  component: FinancialYearsPage,
+});
+const salesReturnsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/sales-returns",
+  component: SalesReturnsPage,
+});
+const purchaseReturnsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/purchase-returns",
+  component: PurchaseReturnsPage,
+});
+const customerGroupsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/customer-groups",
+  component: CustomerGroupsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   companySelectRoute,
@@ -416,6 +742,7 @@ const routeTree = rootRoute.addChildren([
     chartOfAccountsRoute,
     journalEntriesRoute,
     expensesRoute,
+    expenseCategoriesRoute,
     trialBalanceRoute,
     balanceSheetRoute,
     profitLossRoute,
@@ -452,6 +779,14 @@ const routeTree = rootRoute.addChildren([
     chequePrintRoute,
     attendanceRoute,
     ticketsRoute,
+    // New routes
+    creditNotesRoute,
+    debitNotesRoute,
+    openingBalancesRoute,
+    financialYearsRoute,
+    salesReturnsRoute,
+    purchaseReturnsRoute,
+    customerGroupsRoute,
   ]),
 ]);
 

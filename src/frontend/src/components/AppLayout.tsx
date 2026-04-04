@@ -12,12 +12,14 @@ import {
   Award,
   Banknote,
   BarChart3,
+  Bell,
   BookCheck,
   BookMarked,
   BookOpen,
   Building2,
   Calculator,
   CalendarCheck,
+  CalendarDays,
   CalendarOff,
   ChevronDown,
   ChevronLeft,
@@ -42,6 +44,7 @@ import {
   Printer,
   Receipt,
   RefreshCw,
+  RotateCcw,
   Settings,
   Shield,
   ShoppingBag,
@@ -101,6 +104,8 @@ const navGroups: NavGroup[] = [
     module: "sales",
     subItems: [
       { path: "/sales", label: "Sales List", icon: Receipt },
+      { path: "/sales-returns", label: "Sales Returns", icon: RotateCcw },
+      { path: "/credit-notes", label: "Credit Notes", icon: FileText },
       { path: "/receive-payment", label: "Receive Payment", icon: DollarSign },
       { path: "/payment-history", label: "Payment History", icon: History },
       { path: "/payment-modes", label: "Payment Modes", icon: CreditCard },
@@ -118,6 +123,8 @@ const navGroups: NavGroup[] = [
         icon: ClipboardList,
       },
       { path: "/purchases", label: "Invoices / Bills", icon: FileText },
+      { path: "/purchase-returns", label: "Purchase Returns", icon: RotateCcw },
+      { path: "/debit-notes", label: "Debit Notes", icon: FileText },
       { path: "/suppliers", label: "Suppliers", icon: Building2 },
     ],
   },
@@ -126,8 +133,10 @@ const navGroups: NavGroup[] = [
     label: "Customers",
     icon: Users,
     module: "purchases",
-    direct: true,
-    subItems: [{ path: "/customers", label: "Customers", icon: Users }],
+    subItems: [
+      { path: "/customers", label: "Customers", icon: Users },
+      { path: "/customer-groups", label: "Customer Groups", icon: Shield },
+    ],
   },
   {
     key: "pricing",
@@ -174,7 +183,14 @@ const navGroups: NavGroup[] = [
         icon: BookOpen,
       },
       { path: "/journal-entries", label: "Journal Entries", icon: BookMarked },
+      { path: "/opening-balances", label: "Opening Balances", icon: Wallet },
+      {
+        path: "/financial-years",
+        label: "Financial Years",
+        icon: CalendarDays,
+      },
       { path: "/expenses", label: "Expenses", icon: TrendingDown },
+      { path: "/expense-categories", label: "Expense Categories", icon: Tag },
       {
         path: "/bank-reconciliation",
         label: "Bank Reconciliation",
@@ -302,16 +318,8 @@ const navGroups: NavGroup[] = [
         label: "Banking Reports",
         icon: Landmark,
       },
-      {
-        path: "/reports?category=tax",
-        label: "Tax Reports",
-        icon: Coins,
-      },
-      {
-        path: "/reports?category=aging",
-        label: "Aging Reports",
-        icon: Clock,
-      },
+      { path: "/reports?category=tax", label: "Tax Reports", icon: Coins },
+      { path: "/reports?category=aging", label: "Aging Reports", icon: Clock },
       {
         path: "/reports?category=operations",
         label: "Operations Reports",
@@ -448,6 +456,103 @@ function WarehouseSwitcher({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+function NotificationBell() {
+  const navigate = useNavigate();
+
+  const notifications: {
+    id: string;
+    message: string;
+    path: string;
+    type: string;
+  }[] = (() => {
+    try {
+      const items = JSON.parse(localStorage.getItem("bizpos_items") || "[]");
+      const reqs = JSON.parse(
+        localStorage.getItem("bizpos_purchase_requisitions") || "[]",
+      );
+
+      const lowStock = items
+        .filter(
+          (i: { quantity: number; reorderLevel?: number; name: string }) =>
+            i.reorderLevel && i.quantity <= i.reorderLevel,
+        )
+        .slice(0, 5)
+        .map((i: { name: string }) => ({
+          id: `ls-${i.name}`,
+          message: `Low stock: ${i.name}`,
+          path: "/items",
+          type: "warning",
+        }));
+
+      const pendingReqs = reqs
+        .filter(
+          (r: { status: string; requisitionNo: string }) =>
+            r.status === "Submitted",
+        )
+        .slice(0, 5)
+        .map((r: { id: string; requisitionNo: string }) => ({
+          id: `req-${r.id}`,
+          message: `Pending approval: ${r.requisitionNo}`,
+          path: "/purchase-requisitions",
+          type: "info",
+        }));
+
+      return [...lowStock, ...pendingReqs];
+    } catch {
+      return [];
+    }
+  })();
+
+  const count = notifications.length;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          data-ocid="nav.bell.button"
+        >
+          <Bell className="h-5 w-5" />
+          {count > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {count > 9 ? "9+" : count}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-72"
+        data-ocid="nav.dropdown_menu"
+      >
+        <div className="px-3 py-2 border-b">
+          <p className="font-semibold text-sm">Notifications</p>
+          <p className="text-xs text-gray-500">{count} active alerts</p>
+        </div>
+        {count === 0 ? (
+          <div className="px-3 py-4 text-center text-sm text-gray-500">
+            No new notifications
+          </div>
+        ) : (
+          notifications.map((n) => (
+            <DropdownMenuItem
+              key={n.id}
+              onClick={() => navigate({ to: n.path })}
+              className="flex items-start gap-2 py-2"
+            >
+              <div
+                className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${n.type === "warning" ? "bg-orange-500" : "bg-blue-500"}`}
+              />
+              <span className="text-sm leading-tight">{n.message}</span>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function AppLayout() {
   const { currentUser, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -490,7 +595,6 @@ export default function AppLayout() {
     .filter((g) => hasPermission(g.module))
     .map((g) => {
       if (g.key === "admin" && !currentUser?.isSuperUser) {
-        // Hide Companies from non-super users
         return {
           ...g,
           subItems: g.subItems?.filter((s) => s.path !== "/companies"),
@@ -534,11 +638,7 @@ export default function AppLayout() {
       <button
         type="button"
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150 group relative
-          ${
-            active
-              ? "bg-blue-600 text-white"
-              : "text-slate-300 hover:bg-slate-700 hover:text-white"
-          }`}
+          ${active ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"}`}
         onClick={() => {
           if (isDirect && group.subItems?.[0]) {
             navigateTo(group.subItems[0].path);
@@ -625,10 +725,9 @@ export default function AppLayout() {
                 <p className="text-blue-300 text-[10px] font-medium truncate mb-0.5">
                   {(() => {
                     try {
-                      const companies = JSON.parse(
+                      const c = JSON.parse(
                         localStorage.getItem("bizpos_companies") || "[]",
-                      );
-                      const c = companies.find(
+                      ).find(
                         (x: { id: string }) =>
                           x.id === currentUser.activeCompanyId,
                       );
@@ -648,10 +747,9 @@ export default function AppLayout() {
                   <Building2 className="h-3 w-3 flex-shrink-0" />
                   {(() => {
                     try {
-                      const companies = JSON.parse(
+                      const c = JSON.parse(
                         localStorage.getItem("bizpos_companies") || "[]",
-                      );
-                      const c = companies.find(
+                      ).find(
                         (x: { id: string }) =>
                           x.id === currentUser.activeCompanyId,
                       );
@@ -738,11 +836,7 @@ export default function AppLayout() {
                     type="button"
                     onClick={() => navigateTo(item.path)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
-                      ${
-                        active
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                      }`}
+                      ${active ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"}`}
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-70" />
                     {item.label}
@@ -770,8 +864,7 @@ export default function AppLayout() {
 
       {/* Mobile sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 md:hidden
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700">
           <div className="flex items-center gap-2">
@@ -796,12 +889,7 @@ export default function AppLayout() {
                 <button
                   type="button"
                   onClick={() => navigateTo(group.subItems![0].path)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left
-                    ${
-                      isGroupActive(group)
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-300 hover:bg-slate-700 hover:text-white"
-                    }`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left ${isGroupActive(group) ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"}`}
                 >
                   <group.icon className="h-5 w-5" />
                   <span className="text-sm font-medium">{group.label}</span>
@@ -819,12 +907,7 @@ export default function AppLayout() {
                       key={item.path}
                       type="button"
                       onClick={() => navigateTo(item.path)}
-                      className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm text-left
-                        ${
-                          isActive(item.path)
-                            ? "bg-blue-600 text-white"
-                            : "text-slate-300 hover:bg-slate-700 hover:text-white"
-                        }`}
+                      className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm text-left ${isActive(item.path) ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"}`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
@@ -868,7 +951,12 @@ export default function AppLayout() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <span className="font-bold text-slate-900">BizPOS</span>
+          <span className="font-bold text-slate-900 flex-1">BizPOS</span>
+          <NotificationBell />
+        </div>
+        {/* Desktop topbar notification */}
+        <div className="hidden md:flex items-center justify-end px-4 py-2 bg-white border-b border-slate-100">
+          <NotificationBell />
         </div>
         <main className="flex-1 overflow-y-auto">
           <Outlet />

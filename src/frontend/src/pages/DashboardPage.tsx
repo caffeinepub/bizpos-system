@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ClipboardList,
@@ -42,6 +43,7 @@ export default function DashboardPage() {
     purchaseOrders,
   } = useStore();
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   const companyWarehouseIds = useMemo(() => {
     if (!currentUser?.activeCompanyId) return null;
@@ -78,7 +80,13 @@ export default function DashboardPage() {
     0,
   );
   const cashBalance = payments.reduce((sum, p) => sum + p.amount, 0);
-  const lowStockItems = items.filter((i) => i.quantity < 10);
+
+  // Use reorderLevel if available, otherwise fall back to qty < 10
+  const lowStockItems = items.filter((i) => {
+    const level = (i as any).reorderLevel;
+    return level != null ? i.quantity <= level : i.quantity < 10;
+  });
+
   const pendingPOs = purchaseOrders.filter(
     (po) => po.status === "Draft" || po.status === "Sent",
   ).length;
@@ -110,6 +118,63 @@ export default function DashboardPage() {
     ? companies.find((c) => c.id === currentUser.activeCompanyId)
     : null;
 
+  const kpiCards = [
+    {
+      title: "Today's Sales",
+      value: totalSalesToday.toLocaleString(),
+      sub: `${todaySales.length} transactions`,
+      icon: ShoppingCart,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      path: "/sales",
+    },
+    {
+      title: "Today's Purchases",
+      value: totalPurchasesToday.toLocaleString(),
+      sub: `${todayPurchases.length} orders`,
+      icon: ShoppingBag,
+      color: "text-orange-500",
+      bg: "bg-orange-50",
+      path: "/purchases",
+    },
+    {
+      title: "Cash Balance",
+      value: cashBalance.toLocaleString(),
+      sub: "Total collected",
+      icon: DollarSign,
+      color: "text-green-600",
+      bg: "bg-green-50",
+      path: "/payment-history",
+    },
+    {
+      title: "Low Stock Items",
+      value: lowStockItems.length.toString(),
+      sub: "Requires attention",
+      icon: AlertTriangle,
+      color: "text-orange-500",
+      bg: "bg-orange-50",
+      path: "/items",
+    },
+    {
+      title: "Pending POs",
+      value: pendingPOs.toString(),
+      sub: "Awaiting approval",
+      icon: ClipboardList,
+      color: "text-blue-500",
+      bg: "bg-blue-50",
+      path: "/purchase-orders",
+    },
+    {
+      title: "Total Items",
+      value: items.length.toString(),
+      sub: "In inventory",
+      icon: Package,
+      color: "text-purple-500",
+      bg: "bg-purple-50",
+      path: "/items",
+    },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -120,106 +185,39 @@ export default function DashboardPage() {
           </p>
         )}
         <p className="text-gray-600 mt-1">
-          Welcome back! Here's your business overview.
+          Welcome back! Here&apos;s your business overview.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Today's Sales
-            </CardTitle>
-            <ShoppingCart className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {totalSalesToday.toLocaleString()}
-            </div>
-            <p className="text-xs text-green-600 mt-1 flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {todaySales.length} transactions
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Today's Purchases
-            </CardTitle>
-            <ShoppingBag className="h-5 w-5 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {totalPurchasesToday.toLocaleString()}
-            </div>
-            <p className="text-xs text-orange-600 mt-1">
-              {todayPurchases.length} orders
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Cash Balance
-            </CardTitle>
-            <DollarSign className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {cashBalance.toLocaleString()}
-            </div>
-            <p className="text-xs text-green-600 mt-1 flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Total collected
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Low Stock Items
-            </CardTitle>
-            <AlertTriangle className="h-5 w-5 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {lowStockItems.length}
-            </div>
-            <p className="text-xs text-orange-600 mt-1">Requires attention</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Pending POs
-            </CardTitle>
-            <ClipboardList className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{pendingPOs}</div>
-            <p className="text-xs text-blue-600 mt-1">Awaiting approval</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Total Items
-            </CardTitle>
-            <Package className="h-5 w-5 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
-              {items.length}
-            </div>
-            <p className="text-xs text-purple-600 mt-1">In inventory</p>
-          </CardContent>
-        </Card>
+        {kpiCards.map((card) => (
+          <Card
+            key={card.title}
+            className="hover:shadow-lg transition-shadow cursor-pointer hover:border-blue-200"
+            onClick={() => navigate({ to: card.path })}
+            data-ocid={`dashboard.${card.title.toLowerCase().replace(/[^a-z0-9]/g, "_")}.card`}
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                {card.title}
+              </CardTitle>
+              <div className={`${card.bg} p-1.5 rounded-lg`}>
+                <card.icon className={`h-4 w-4 ${card.color}`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {card.value}
+              </div>
+              <p
+                className={`text-xs ${card.color} mt-1 flex items-center gap-1`}
+              >
+                <TrendingUp className="h-3 w-3" />
+                {card.sub}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Card>
@@ -284,7 +282,12 @@ export default function DashboardPage() {
                   </TableRow>
                 ) : (
                   recentSales.map((sale, i) => (
-                    <TableRow key={sale.id} data-ocid={`sales.item.${i + 1}`}>
+                    <TableRow
+                      key={sale.id}
+                      data-ocid={`sales.item.${i + 1}`}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => navigate({ to: "/sales" })}
+                    >
                       <TableCell className="font-medium">{sale.id}</TableCell>
                       <TableCell>{sale.customerName}</TableCell>
                       <TableCell>
@@ -313,7 +316,14 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Low Stock Alerts</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Low Stock Alerts</CardTitle>
+              {lowStockItems.length > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {lowStockItems.length} items
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -322,27 +332,36 @@ export default function DashboardPage() {
                   <TableHead>Item</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Reorder Level</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {lowStockItems.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={3}
+                      colSpan={4}
                       className="text-center text-muted-foreground"
                     >
                       All items well stocked
                     </TableCell>
                   </TableRow>
                 ) : (
-                  lowStockItems.slice(0, 5).map((item, i) => (
-                    <TableRow key={item.id} data-ocid={`stock.item.${i + 1}`}>
+                  lowStockItems.slice(0, 6).map((item, i) => (
+                    <TableRow
+                      key={item.id}
+                      data-ocid={`stock.item.${i + 1}`}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => navigate({ to: "/items" })}
+                    >
                       <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-gray-500">
                         {item.sku}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant="destructive">{item.quantity}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-gray-500 text-sm">
+                        {(item as any).reorderLevel ?? 10}
                       </TableCell>
                     </TableRow>
                   ))

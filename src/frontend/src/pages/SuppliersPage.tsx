@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -35,7 +43,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import AttachmentManager from "../components/AttachmentManager";
 import { useAuth } from "../context/AuthContext";
@@ -45,11 +53,19 @@ import { exportExcel, exportPDF } from "../utils/exportUtils";
 
 export default function SuppliersPage() {
   const { currentUser } = useAuth();
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useStore();
+  const {
+    suppliers,
+    purchases,
+    payments,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
+  } = useStore();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [ledgerSupplierId, setLedgerSupplierId] = useState("");
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -102,6 +118,11 @@ export default function SuppliersPage() {
       ["Name", "Phone", "Email", "Address"],
       rows,
       "suppliers.pdf",
+      {
+        companyName: "BizPOS",
+        reportTitle: "Suppliers",
+        generatedBy: currentUser?.name,
+      },
     );
   };
 
@@ -113,13 +134,106 @@ export default function SuppliersPage() {
       ["Name", "Phone", "Email", "Address"],
       rows,
       {
-        companyName: "BizPOS System",
+        companyName: "BizPOS",
         reportTitle: "Supplier List",
-        generatedBy: currentUser?.name ?? "Unknown",
+        generatedBy: currentUser?.name,
         filters: search ? [{ label: "Search", value: search }] : [],
       },
     );
   };
+
+  // Supplier Ledger
+  const ledgerEntries = useMemo(() => {
+    if (!ledgerSupplierId) return [];
+    const entries: {
+      date: string;
+      ref: string;
+      type: string;
+      debit: number;
+      credit: number;
+    }[] = [];
+
+    // Opening balance
+    try {
+      const obs = JSON.parse(
+        localStorage.getItem("bizpos_opening_balances") || "[]",
+      );
+      const ob = obs.find(
+        (x: any) =>
+          x.entityId === ledgerSupplierId && x.entityType === "supplier",
+      );
+      if (ob && ob.amount !== 0) {
+        entries.push({
+          date: ob.date,
+          ref: "Opening Balance",
+          type: "Opening",
+          debit: ob.amount < 0 ? Math.abs(ob.amount) : 0,
+          credit: ob.amount > 0 ? ob.amount : 0,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const supp = suppliers.find((s) => s.id === ledgerSupplierId);
+    if (!supp) return entries;
+
+    // Purchase invoices
+    const suppPurchases = purchases.filter(
+      (p) => p.supplierId === ledgerSupplierId,
+    );
+    for (const p of suppPurchases)
+      entries.push({
+        date: p.purchaseDate,
+        ref: p.id,
+        type: "Purchase",
+        debit: 0,
+        credit: p.total,
+      });
+
+    // Payments to supplier
+    const suppPayments = payments.filter(
+      (p) =>
+        (p as any).supplierId === ledgerSupplierId ||
+        (p as any).supplierName === supp.name,
+    );
+    for (const p of suppPayments)
+      entries.push({
+        date:
+          (p as any).paymentDate || (p as any).createdAt?.slice(0, 10) || "",
+        ref: p.id,
+        type: "Payment",
+        debit: p.amount,
+        credit: 0,
+      });
+
+    // Debit notes
+    try {
+      const dns = JSON.parse(
+        localStorage.getItem("bizpos_debit_notes") || "[]",
+      );
+      for (const dn of dns.filter(
+        (x: any) => x.supplierId === ledgerSupplierId && x.status === "Posted",
+      )) {
+        entries.push({
+          date: dn.date,
+          ref: dn.noteNumber,
+          type: "Debit Note",
+          debit: dn.totalAmount,
+          credit: 0,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    let balance = 0;
+    return entries.map((e) => {
+      balance += e.credit - e.debit;
+      return { ...e, balance };
+    });
+  }, [ledgerSupplierId, suppliers, purchases, payments]);
 
   return (
     <div className="p-6 space-y-6">
@@ -134,96 +248,205 @@ export default function SuppliersPage() {
             onClick={handleExportPDF}
             data-ocid="suppliers.secondary_button"
           >
-            <Download className="h-4 w-4 mr-2" /> PDF
+            <Download className="h-4 w-4 mr-2" />
+            PDF
           </Button>
           <Button
             variant="outline"
             onClick={handleExportExcel}
             data-ocid="suppliers.secondary_button"
           >
-            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
           </Button>
           <Button onClick={openAdd} data-ocid="suppliers.open_modal_button">
-            <Plus className="h-4 w-4 mr-2" /> Add Supplier
+            <Plus className="h-4 w-4 mr-2" />
+            Add Supplier
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Supplier List ({filtered.length})
-          </CardTitle>
-          <div className="relative mt-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search suppliers..."
-              className="pl-9"
-              data-ocid="suppliers.search_input"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center py-8 text-muted-foreground"
-                    data-ocid="suppliers.empty_state"
-                  >
-                    No suppliers found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((s, i) => (
-                  <TableRow key={s.id} data-ocid={`suppliers.item.${i + 1}`}>
-                    <TableCell className="font-semibold">{s.name}</TableCell>
-                    <TableCell>{s.phone}</TableCell>
-                    <TableCell>{s.email}</TableCell>
-                    <TableCell className="text-gray-600 max-w-48 truncate">
-                      {s.address}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(s)}
-                          data-ocid={`suppliers.edit_button.${i + 1}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteId(s.id)}
-                          className="text-red-600 hover:bg-red-50"
-                          data-ocid={`suppliers.delete_button.${i + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+      <Tabs defaultValue="list">
+        <TabsList>
+          <TabsTrigger value="list" data-ocid="suppliers.tab">
+            Supplier List
+          </TabsTrigger>
+          <TabsTrigger value="ledger" data-ocid="suppliers.tab">
+            Supplier Ledger
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Supplier List ({filtered.length})
+              </CardTitle>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search suppliers..."
+                  className="pl-9"
+                  data-ocid="suppliers.search_input"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="text-center py-8 text-muted-foreground"
+                        data-ocid="suppliers.empty_state"
+                      >
+                        No suppliers found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((s, i) => (
+                      <TableRow
+                        key={s.id}
+                        data-ocid={`suppliers.item.${i + 1}`}
+                      >
+                        <TableCell className="font-semibold">
+                          {s.name}
+                        </TableCell>
+                        <TableCell>{s.phone}</TableCell>
+                        <TableCell>{s.email}</TableCell>
+                        <TableCell className="text-gray-600 max-w-48 truncate">
+                          {s.address}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEdit(s)}
+                              data-ocid={`suppliers.edit_button.${i + 1}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteId(s.id)}
+                              className="text-red-600 hover:bg-red-50"
+                              data-ocid={`suppliers.delete_button.${i + 1}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ledger">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <CardTitle className="text-base">Supplier Ledger</CardTitle>
+                <Select
+                  value={ledgerSupplierId}
+                  onValueChange={setLedgerSupplierId}
+                >
+                  <SelectTrigger className="w-52" data-ocid="suppliers.select">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!ledgerSupplierId ? (
+                <p
+                  className="text-center text-muted-foreground py-8"
+                  data-ocid="suppliers.empty_state"
+                >
+                  Select a supplier to view their ledger
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Reference</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ledgerEntries.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          No transactions found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      ledgerEntries.map((e, i) => (
+                        <TableRow
+                          key={`${e.ref}-${e.date}-${String(i)}`}
+                          data-ocid={`suppliers.ledger.item.${i + 1}`}
+                        >
+                          <TableCell>{e.date}</TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {e.ref}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {e.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {e.debit > 0 ? e.debit.toLocaleString() : ""}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {e.credit > 0 ? e.credit.toLocaleString() : ""}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-medium ${(e as any).balance > 0 ? "text-orange-600" : "text-green-600"}`}
+                          >
+                            {(e as any).balance.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent data-ocid="suppliers.dialog">
@@ -240,7 +463,7 @@ export default function SuppliersPage() {
               )}
             </TabsList>
             <TabsContent value="details">
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <Label>Name *</Label>
                   <Input
@@ -286,10 +509,14 @@ export default function SuppliersPage() {
                   <Button
                     variant="outline"
                     onClick={() => setDialogOpen(false)}
+                    data-ocid="suppliers.cancel_button"
                   >
                     Cancel
                   </Button>
-                  <Button onClick={handleSave}>
+                  <Button
+                    onClick={handleSave}
+                    data-ocid="suppliers.submit_button"
+                  >
                     {editingSupplier ? "Update" : "Add"} Supplier
                   </Button>
                 </div>
