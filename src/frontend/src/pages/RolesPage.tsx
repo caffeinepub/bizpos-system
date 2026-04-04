@@ -34,37 +34,136 @@ import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 import type { Role } from "../store/useStore";
 
-const ALL_PERMISSIONS = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "pos", label: "Point of Sale" },
-  { key: "sales", label: "Sales Management" },
-  { key: "purchases", label: "Purchase Management" },
-  { key: "inventory", label: "Inventory Management" },
-  { key: "warehouse", label: "Warehouse Management" },
-  { key: "shops", label: "Shops Management" },
-  { key: "accounts", label: "Accounts & Accounting" },
-  { key: "payments", label: "Payment Management" },
-  { key: "reports", label: "Reports & Analytics" },
-  { key: "employees", label: "Employee Management" },
-  { key: "salary_processing", label: "Salary Processing" },
-  { key: "trial_balance", label: "Trial Balance" },
-  { key: "balance_sheet", label: "Balance Sheet" },
-  { key: "profit_loss", label: "Profit & Loss" },
-  { key: "users", label: "User Management" },
-  { key: "roles", label: "Roles Management" },
-  { key: "settings", label: "System Settings" },
-  { key: "customers", label: "Customers" },
-  { key: "purchase_orders", label: "Purchase Orders" },
-  { key: "bank_reconciliation", label: "Bank Reconciliation" },
-  { key: "departments", label: "Departments" },
-  { key: "designations", label: "Designations" },
-  { key: "allowance_types", label: "Allowance Types" },
-  { key: "salary_slips", label: "Salary Slips" },
-  { key: "shifts", label: "Shift Management" },
-  { key: "shift_closing", label: "Shift Closing" },
-  { key: "attendance", label: "Attendance" },
-  { key: "tickets", label: "Ticket Management" },
+type PermissionGroup = {
+  group: string;
+  permissions: { key: string; label: string }[];
+};
+
+const PERMISSION_GROUPS: PermissionGroup[] = [
+  {
+    group: "General",
+    permissions: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "reports", label: "Reports & Analytics" },
+      { key: "logs", label: "System Logs" },
+      { key: "settings", label: "System Settings" },
+    ],
+  },
+  {
+    group: "POS & Sales",
+    permissions: [
+      { key: "pos", label: "Point of Sale" },
+      { key: "sales", label: "Sales Management" },
+      { key: "sales_returns", label: "Sales Returns" },
+      { key: "credit_notes", label: "Credit Notes" },
+      { key: "payments", label: "Payment Management" },
+    ],
+  },
+  {
+    group: "Customers",
+    permissions: [
+      { key: "customers", label: "Customers" },
+      { key: "customer_groups", label: "Customer Groups" },
+    ],
+  },
+  {
+    group: "Purchases & Suppliers",
+    permissions: [
+      { key: "purchases", label: "Purchase Invoices / Bills" },
+      { key: "purchase_orders", label: "Purchase Orders" },
+      { key: "purchase_returns", label: "Purchase Returns" },
+      { key: "debit_notes", label: "Debit Notes" },
+      { key: "suppliers", label: "Suppliers" },
+    ],
+  },
+  {
+    group: "Pricing",
+    permissions: [
+      { key: "taxes", label: "Tax Rates" },
+      { key: "discounts", label: "Discounts" },
+      { key: "promotions", label: "Promotions" },
+    ],
+  },
+  {
+    group: "Inventory",
+    permissions: [
+      { key: "inventory", label: "Items / Inventory" },
+      { key: "stock_adjustment", label: "Stock Adjustment" },
+      { key: "warehouse_stock", label: "Warehouse Stock View" },
+    ],
+  },
+  {
+    group: "Warehouse & Hierarchy",
+    permissions: [
+      { key: "companies", label: "Companies" },
+      { key: "warehouse", label: "Warehouses" },
+      { key: "shops", label: "Shops" },
+    ],
+  },
+  {
+    group: "Accounting",
+    permissions: [
+      { key: "accounts", label: "Chart of Accounts" },
+      { key: "journal_entries", label: "Journal Entries" },
+      { key: "opening_balances", label: "Opening Balances" },
+      { key: "financial_years", label: "Financial Years" },
+      { key: "expenses", label: "Expenses" },
+      { key: "expense_categories", label: "Expense Categories" },
+      { key: "bank_reconciliation", label: "Bank Reconciliation" },
+      { key: "trial_balance", label: "Trial Balance" },
+      { key: "balance_sheet", label: "Balance Sheet" },
+      { key: "profit_loss", label: "Profit & Loss" },
+    ],
+  },
+  {
+    group: "Banking",
+    permissions: [
+      { key: "banks", label: "Banks" },
+      { key: "bank_branches", label: "Bank Branches" },
+      { key: "bank_accounts", label: "Bank Accounts" },
+      { key: "cheque_books", label: "Cheque Books" },
+      { key: "cheque_templates", label: "Cheque Templates" },
+      { key: "cheque_print", label: "Cheque Print" },
+    ],
+  },
+  {
+    group: "HR & Payroll",
+    permissions: [
+      { key: "employees", label: "Employees" },
+      { key: "salary_processing", label: "Salary Processing" },
+      { key: "leave_management", label: "Leave Management" },
+      { key: "departments", label: "Departments" },
+      { key: "designations", label: "Designations" },
+      { key: "allowance_types", label: "Allowance Types" },
+      { key: "salary_slips", label: "Salary Slips" },
+      { key: "shifts", label: "Shift Management" },
+      { key: "shift_closing", label: "Shift Closing" },
+      { key: "attendance", label: "Attendance" },
+    ],
+  },
+  {
+    group: "Supply Chain",
+    permissions: [
+      { key: "purchase_requisitions", label: "Purchase Requisitions" },
+      { key: "goods_receipt", label: "Goods Receipt Notes" },
+      { key: "inventory_transfers", label: "Inventory Transfers" },
+      { key: "shipments", label: "Shipment Tracking" },
+      { key: "supplier_performance", label: "Supplier Performance" },
+    ],
+  },
+  {
+    group: "Admin",
+    permissions: [
+      { key: "users", label: "User Management" },
+      { key: "roles", label: "Roles Management" },
+      { key: "tickets", label: "Ticket Management" },
+    ],
+  },
 ];
+
+const ALL_PERMISSION_KEYS = PERMISSION_GROUPS.flatMap((g) =>
+  g.permissions.map((p) => p.key),
+);
 
 export default function RolesPage() {
   const { roles, addRole, updateRole, deleteRole } = useStore();
@@ -101,11 +200,19 @@ export default function RolesPage() {
     }));
   };
 
-  const selectAll = () =>
+  const toggleGroup = (group: PermissionGroup) => {
+    const groupKeys = group.permissions.map((p) => p.key);
+    const allChecked = groupKeys.every((k) => form.permissions.includes(k));
     setForm((prev) => ({
       ...prev,
-      permissions: ALL_PERMISSIONS.map((p) => p.key),
+      permissions: allChecked
+        ? prev.permissions.filter((k) => !groupKeys.includes(k))
+        : [...new Set([...prev.permissions, ...groupKeys])],
     }));
+  };
+
+  const selectAll = () =>
+    setForm((prev) => ({ ...prev, permissions: ALL_PERMISSION_KEYS }));
   const deselectAll = () => setForm((prev) => ({ ...prev, permissions: [] }));
 
   const handleSave = () => {
@@ -222,31 +329,40 @@ export default function RolesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="roles.dialog">
+        <DialogContent
+          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          data-ocid="roles.dialog"
+        >
           <DialogHeader>
             <DialogTitle>{editingRole ? "Edit Role" : "Add Role"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Role Name *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                data-ocid="roles.input"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Role Name *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  data-ocid="roles.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Description</Label>
+                <Input
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Input
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-              />
-            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Permissions</Label>
+                <Label>
+                  Permissions ({form.permissions.length} of{" "}
+                  {ALL_PERMISSION_KEYS.length} selected)
+                </Label>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -266,25 +382,69 @@ export default function RolesPage() {
                   </Button>
                 </div>
               </div>
-              <div className="border rounded-md p-3 grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                {ALL_PERMISSIONS.map((perm) => (
-                  <div key={perm.key} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`perm-${perm.key}`}
-                      checked={form.permissions.includes(perm.key)}
-                      onCheckedChange={() => togglePermission(perm.key)}
-                      data-ocid={"roles.checkbox"}
-                    />
-                    <label
-                      htmlFor={`perm-${perm.key}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {perm.label}
-                    </label>
-                  </div>
-                ))}
+
+              <div className="border rounded-md divide-y max-h-[420px] overflow-y-auto">
+                {PERMISSION_GROUPS.map((group) => {
+                  const groupKeys = group.permissions.map((p) => p.key);
+                  const checkedCount = groupKeys.filter((k) =>
+                    form.permissions.includes(k),
+                  ).length;
+                  const allChecked = checkedCount === groupKeys.length;
+                  const someChecked = checkedCount > 0 && !allChecked;
+                  return (
+                    <div key={group.group} className="p-3">
+                      <div
+                        className="flex items-center gap-2 mb-2 cursor-pointer select-none"
+                        onClick={() => toggleGroup(group)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && toggleGroup(group)
+                        }
+                      >
+                        <Checkbox
+                          checked={allChecked}
+                          data-state={
+                            someChecked
+                              ? "indeterminate"
+                              : allChecked
+                                ? "checked"
+                                : "unchecked"
+                          }
+                          className="pointer-events-none"
+                        />
+                        <span className="text-sm font-semibold text-gray-700">
+                          {group.group}
+                        </span>
+                        <span className="text-xs text-gray-400 ml-1">
+                          ({checkedCount}/{groupKeys.length})
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 pl-6 sm:grid-cols-3">
+                        {group.permissions.map((perm) => (
+                          <div
+                            key={perm.key}
+                            className="flex items-center gap-2"
+                          >
+                            <Checkbox
+                              id={`perm-${perm.key}`}
+                              checked={form.permissions.includes(perm.key)}
+                              onCheckedChange={() => togglePermission(perm.key)}
+                              data-ocid="roles.checkbox"
+                            />
+                            <label
+                              htmlFor={`perm-${perm.key}`}
+                              className="text-sm cursor-pointer text-gray-600"
+                            >
+                              {perm.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+
             <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleSave}
