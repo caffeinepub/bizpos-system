@@ -4205,12 +4205,40 @@ export function useStore() {
   );
   const updatePurchase = useCallback(
     (id: string, purchase: Partial<Purchase>) => {
-      save(
-        KEYS.purchases,
-        load<Purchase[]>(KEYS.purchases, []).map((p) =>
-          p.id === id ? { ...p, ...purchase } : p,
-        ),
+      const existing = load<Purchase[]>(KEYS.purchases, []);
+      const old = existing.find((p) => p.id === id);
+      const updated = existing.map((p) =>
+        p.id === id ? { ...p, ...purchase } : p,
       );
+      save(KEYS.purchases, updated);
+      // Handle stock changes when status changes
+      if (old && purchase.status && old.status !== purchase.status) {
+        const newStatus = purchase.status;
+        const oldStatus = old.status;
+        const mergedPurchase = { ...old, ...purchase };
+        const currentItems = load<Item[]>(KEYS.items, []);
+        if (oldStatus !== "Received" && newStatus === "Received") {
+          // Increment stock
+          const updatedItems = currentItems.map((item) => {
+            const pi = mergedPurchase.items?.find((i) => i.itemId === item.id);
+            if (pi) return { ...item, quantity: item.quantity + pi.quantity };
+            return item;
+          });
+          save(KEYS.items, updatedItems);
+        } else if (oldStatus === "Received" && newStatus !== "Received") {
+          // Decrement stock (e.g., cancelled after received)
+          const updatedItems = currentItems.map((item) => {
+            const pi = mergedPurchase.items?.find((i) => i.itemId === item.id);
+            if (pi)
+              return {
+                ...item,
+                quantity: Math.max(0, item.quantity - pi.quantity),
+              };
+            return item;
+          });
+          save(KEYS.items, updatedItems);
+        }
+      }
     },
     [],
   );

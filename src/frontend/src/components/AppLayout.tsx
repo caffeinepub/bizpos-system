@@ -16,6 +16,7 @@ import {
   BookCheck,
   BookMarked,
   BookOpen,
+  Bookmark,
   Building2,
   Calculator,
   CalendarCheck,
@@ -47,8 +48,10 @@ import {
   RotateCcw,
   Settings,
   Shield,
+  ShieldOff,
   ShoppingBag,
   ShoppingCart,
+  Star,
   Store,
   Tag,
   TrendingDown,
@@ -132,7 +135,7 @@ const navGroups: NavGroup[] = [
     key: "customers",
     label: "Customers",
     icon: Users,
-    module: "purchases",
+    module: "customers",
     subItems: [
       { path: "/customers", label: "Customers", icon: Users },
       { path: "/customer-groups", label: "Customer Groups", icon: Shield },
@@ -142,7 +145,7 @@ const navGroups: NavGroup[] = [
     key: "pricing",
     label: "Pricing",
     icon: Percent,
-    module: "inventory",
+    module: "pricing",
     subItems: [
       { path: "/taxes", label: "Tax Rates", icon: Percent },
       { path: "/discounts", label: "Discounts", icon: Tag },
@@ -231,7 +234,7 @@ const navGroups: NavGroup[] = [
     key: "supplychain",
     label: "Supply Chain",
     icon: Truck,
-    module: "purchases",
+    module: "supply_chain",
     subItems: [
       {
         path: "/purchase-requisitions",
@@ -257,7 +260,7 @@ const navGroups: NavGroup[] = [
     key: "banking",
     label: "Banking",
     icon: Landmark,
-    module: "accounts",
+    module: "banking",
     subItems: [
       { path: "/banks", label: "Banks", icon: Building2 },
       { path: "/bank-branches", label: "Branches", icon: MapPin },
@@ -343,116 +346,343 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function WarehouseSwitcher({ collapsed }: { collapsed: boolean }) {
-  const { currentUser, setActiveWarehouse } = useAuth();
-  const navigate = useNavigate();
+function getLabelForPath(path: string): string {
+  for (const group of navGroups) {
+    const item = group.subItems?.find(
+      (s) => s.path.split("?")[0] === path.split("?")[0],
+    );
+    if (item) return item.label;
+  }
+  return path;
+}
 
-  const warehouses: {
-    id: string;
-    name: string;
-    location: string;
-    status: string;
-  }[] = (() => {
+interface BookmarkEntry {
+  path: string;
+  label: string;
+}
+
+function BookmarkButton({
+  currentPath,
+  navigateTo,
+  currentUser,
+}: {
+  currentPath: string;
+  navigateTo: (path: string) => void;
+  currentUser: any;
+}) {
+  const [, forceUpdate] = useState(0);
+
+  const storageKey = `bizpos_bookmarks_${currentUser?.id ?? "guest"}`;
+
+  const getBookmarks = (): BookmarkEntry[] => {
     try {
-      return JSON.parse(localStorage.getItem("bizpos_warehouses") || "[]");
+      return JSON.parse(localStorage.getItem(storageKey) || "[]");
     } catch {
       return [];
     }
-  })();
-
-  const assignedIds = currentUser?.assignedWarehouseIds ?? [];
-  const visible =
-    assignedIds.length === 0
-      ? warehouses
-      : warehouses.filter((w) => assignedIds.includes(w.id));
-  const active = warehouses.find(
-    (w) => w.id === currentUser?.activeWarehouseId,
-  );
-
-  const select = (id: string | null) => {
-    setActiveWarehouse(id);
-    navigate({ to: "/dashboard" });
   };
 
-  if (collapsed) {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="w-full flex items-center justify-center px-3 py-2 mb-1 rounded-lg text-blue-300 hover:bg-slate-700 hover:text-white transition-colors"
-            title={active ? active.name : "All Warehouses"}
-            data-ocid="nav.warehouse_switcher.button"
-          >
-            <Building2 className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" className="w-52">
-          <DropdownMenuItem
-            onClick={() => select(null)}
-            data-ocid="nav.warehouse_all.button"
-          >
-            <span className="font-medium">All Warehouses</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {visible.map((wh) => (
-            <DropdownMenuItem key={wh.id} onClick={() => select(wh.id)}>
-              {wh.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+  const saveBookmarks = (bm: BookmarkEntry[]) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(bm));
+    } catch {
+      // ignore
+    }
+    forceUpdate((n) => n + 1);
+  };
+
+  const bookmarks = getBookmarks();
+  const isBookmarked = bookmarks.some(
+    (b) => b.path.split("?")[0] === currentPath.split("?")[0],
+  );
+
+  const addBookmark = () => {
+    const label = getLabelForPath(currentPath);
+    saveBookmarks([...bookmarks, { path: currentPath, label }]);
+  };
+
+  const removeBookmark = (path: string) => {
+    saveBookmarks(
+      bookmarks.filter((b) => b.path.split("?")[0] !== path.split("?")[0]),
     );
-  }
+  };
 
   return (
-    <div className="px-2 pb-1">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 hover:text-blue-200 transition-colors text-xs"
-            data-ocid="nav.warehouse_switcher.button"
-          >
-            <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="flex-1 truncate text-left font-medium">
-              {active ? active.name : "All Warehouses"}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          title="Bookmarks"
+          data-ocid="nav.bookmarks.button"
+        >
+          <Bookmark className="h-5 w-5" />
+          {bookmarks.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {bookmarks.length > 9 ? "9+" : bookmarks.length}
             </span>
-            <ChevronDown className="h-3 w-3 opacity-60" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-52">
-          <DropdownMenuItem
-            onClick={() => select(null)}
-            data-ocid="nav.warehouse_all.button"
-          >
-            <span className="font-medium">All Warehouses</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {visible.map((wh) => (
-            <DropdownMenuItem
-              key={wh.id}
-              onClick={() => select(wh.id)}
-              className={
-                currentUser?.activeWarehouseId === wh.id
-                  ? "bg-blue-50 text-blue-700"
-                  : ""
-              }
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-72"
+        data-ocid="nav.bookmarks.dropdown_menu"
+      >
+        <div className="px-3 py-2 border-b">
+          <p className="font-semibold text-sm">Bookmarks</p>
+          <p className="text-xs text-gray-500">
+            {bookmarks.length === 0
+              ? "No bookmarks saved"
+              : `${bookmarks.length} saved page${bookmarks.length === 1 ? "" : "s"}`}
+          </p>
+        </div>
+        {bookmarks.length === 0 ? (
+          <div className="px-3 py-3 text-center text-sm text-gray-400">
+            No bookmarks yet
+          </div>
+        ) : (
+          bookmarks.map((bm, idx) => (
+            <div
+              key={bm.path}
+              className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50"
+              data-ocid={`nav.bookmarks.item.${idx + 1}`}
             >
-              {wh.name}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
+              <button
+                type="button"
+                className="flex items-center gap-2 flex-1 text-sm text-left py-1 px-1 rounded hover:text-blue-600 transition-colors"
+                onClick={() => navigateTo(bm.path)}
+              >
+                <Bookmark className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                <span className="truncate">{bm.label}</span>
+              </button>
+              <button
+                type="button"
+                className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                onClick={() => removeBookmark(bm.path)}
+                title="Remove bookmark"
+                data-ocid={`nav.bookmarks.delete_button.${idx + 1}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))
+        )}
+        <DropdownMenuSeparator />
+        {isBookmarked ? (
           <DropdownMenuItem
-            onClick={() => navigate({ to: "/warehouse-select" })}
-            className="text-blue-600 text-xs"
-            data-ocid="nav.warehouse_select.button"
+            onClick={() => removeBookmark(currentPath)}
+            className="text-red-600 focus:text-red-600 cursor-pointer"
+            data-ocid="nav.bookmarks.remove_button"
           >
-            Switch Warehouse...
+            <X className="h-4 w-4 mr-2" />
+            Remove bookmark
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        ) : (
+          <DropdownMenuItem
+            onClick={addBookmark}
+            className="text-blue-600 focus:text-blue-600 cursor-pointer"
+            data-ocid="nav.bookmarks.add_button"
+          >
+            <Bookmark className="h-4 w-4 mr-2" />
+            Bookmark this page
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function FavoritesButton({
+  navigateTo,
+  currentUser,
+}: {
+  navigateTo: (path: string) => void;
+  currentUser: any;
+}) {
+  const [, forceUpdate] = useState(0);
+  const [configuring, setConfiguring] = useState(false);
+
+  const storageKey = `bizpos_favorites_${currentUser?.id ?? "guest"}`;
+
+  const getFavorites = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || "[]");
+    } catch {
+      return [];
+    }
+  };
+
+  const saveFavorites = (favs: string[]) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(favs));
+    } catch {
+      // ignore
+    }
+    forceUpdate((n) => n + 1);
+  };
+
+  const favorites = getFavorites();
+
+  const toggleFavorite = (path: string) => {
+    const current = getFavorites();
+    if (current.includes(path)) {
+      saveFavorites(current.filter((p) => p !== path));
+    } else {
+      saveFavorites([...current, path]);
+    }
+  };
+
+  // Flatten all nav sub-items for the configure list
+  const allNavItems = navGroups.flatMap((g) =>
+    (g.subItems ?? []).map((item) => ({ ...item, groupLabel: g.label })),
+  );
+
+  const favoriteItems = favorites
+    .map((path) => allNavItems.find((i) => i.path === path))
+    .filter(Boolean) as (SubItem & { groupLabel: string })[];
+
+  return (
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (!open) setConfiguring(false);
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          title="Favorites"
+          data-ocid="nav.favorites.button"
+        >
+          <Star className="h-5 w-5" />
+          {favorites.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-yellow-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {favorites.length > 9 ? "9+" : favorites.length}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-72"
+        data-ocid="nav.favorites.dropdown_menu"
+        onInteractOutside={(e) => {
+          if (configuring) e.preventDefault();
+        }}
+      >
+        {!configuring ? (
+          <>
+            <div className="px-3 py-2 border-b flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-sm">Quick Access</p>
+                <p className="text-xs text-gray-500">
+                  {favorites.length === 0
+                    ? "No favorites pinned"
+                    : `${favorites.length} pinned page${favorites.length === 1 ? "" : "s"}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                onClick={() => setConfiguring(true)}
+                data-ocid="nav.favorites.configure_button"
+              >
+                Configure
+              </button>
+            </div>
+            {favoriteItems.length === 0 ? (
+              <div className="px-3 py-4 text-center text-sm text-gray-400">
+                No favorites yet.
+                <br />
+                <button
+                  type="button"
+                  className="mt-1 text-blue-600 hover:underline text-xs"
+                  onClick={() => setConfiguring(true)}
+                >
+                  Add favorites
+                </button>
+              </div>
+            ) : (
+              favoriteItems.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <DropdownMenuItem
+                    key={item.path}
+                    onClick={() => navigateTo(item.path)}
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-ocid={`nav.favorites.item.${idx + 1}`}
+                  >
+                    <Icon className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                    <span className="flex-1 truncate text-sm">
+                      {item.label}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {item.groupLabel}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })
+            )}
+          </>
+        ) : (
+          <>
+            <div className="px-3 py-2 border-b flex items-center gap-2">
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-gray-100 text-gray-500"
+                onClick={() => setConfiguring(false)}
+                data-ocid="nav.favorites.configure_back_button"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div>
+                <p className="font-semibold text-sm">Edit Favorites</p>
+                <p className="text-xs text-gray-500">
+                  Toggle to pin/unpin pages
+                </p>
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto py-1">
+              {allNavItems.map((item, idx) => {
+                const Icon = item.icon;
+                const isFav = favorites.includes(item.path);
+                return (
+                  <div
+                    key={`${item.path}-${idx}`}
+                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50"
+                    data-ocid={`nav.favorites.configure.item.${idx + 1}`}
+                  >
+                    <Icon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="flex-1 text-sm truncate">
+                      {item.label}
+                    </span>
+                    <button
+                      type="button"
+                      className={`p-1 rounded transition-colors ${
+                        isFav
+                          ? "text-yellow-500 hover:text-yellow-600"
+                          : "text-gray-300 hover:text-yellow-400"
+                      }`}
+                      onClick={() => toggleFavorite(item.path)}
+                      title={
+                        isFav ? "Remove from favorites" : "Add to favorites"
+                      }
+                      data-ocid={`nav.favorites.configure.toggle.${idx + 1}`}
+                    >
+                      <Star
+                        className="h-4 w-4"
+                        fill={isFav ? "currentColor" : "none"}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -551,6 +781,48 @@ function NotificationBell() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function AccessGuard() {
+  const { hasPermission } = useAuth();
+  const navigate = useNavigate();
+  const routerState = useRouterState();
+  const currentPath = routerState.location.pathname;
+
+  // Find the module for the current path
+  const pathModule = navGroups.find((g) =>
+    g.subItems?.some((s) => s.path.split("?")[0] === currentPath),
+  )?.module;
+
+  const isAccessDenied =
+    pathModule && !hasPermission(pathModule) && currentPath !== "/dashboard";
+
+  if (isAccessDenied) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+            <ShieldOff className="h-8 w-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
+          <p className="text-gray-500 max-w-sm">
+            You do not have permission to access this page. Contact your
+            administrator to request access.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/dashboard" })}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            data-ocid="access_denied.button"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <Outlet />;
 }
 
 export default function AppLayout() {
@@ -716,9 +988,6 @@ export default function AppLayout() {
 
         {/* User info */}
         <div className="border-t border-slate-700 p-2">
-          {!collapsed && currentUser?.isSuperUser && (
-            <WarehouseSwitcher collapsed={false} />
-          )}
           {!collapsed && (
             <div className="px-2 py-1 mb-1">
               {!currentUser?.isSuperUser && currentUser?.activeCompanyId && (
@@ -782,9 +1051,6 @@ export default function AppLayout() {
                 )}
               </p>
             </div>
-          )}
-          {collapsed && currentUser?.isSuperUser && (
-            <WarehouseSwitcher collapsed={true} />
           )}
           <button
             type="button"
@@ -864,7 +1130,9 @@ export default function AppLayout() {
 
       {/* Mobile sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 md:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-slate-700">
           <div className="flex items-center gap-2">
@@ -889,7 +1157,11 @@ export default function AppLayout() {
                 <button
                   type="button"
                   onClick={() => navigateTo(group.subItems![0].path)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left ${isGroupActive(group) ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left ${
+                    isGroupActive(group)
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                  }`}
                 >
                   <group.icon className="h-5 w-5" />
                   <span className="text-sm font-medium">{group.label}</span>
@@ -907,7 +1179,11 @@ export default function AppLayout() {
                       key={item.path}
                       type="button"
                       onClick={() => navigateTo(item.path)}
-                      className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm text-left ${isActive(item.path) ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700 hover:text-white"}`}
+                      className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm text-left ${
+                        isActive(item.path)
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-300 hover:bg-slate-700 hover:text-white"
+                      }`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
@@ -952,14 +1228,26 @@ export default function AppLayout() {
             <Menu className="h-5 w-5" />
           </Button>
           <span className="font-bold text-slate-900 flex-1">BizPOS</span>
+          <FavoritesButton navigateTo={navigateTo} currentUser={currentUser} />
+          <BookmarkButton
+            currentPath={currentPath}
+            navigateTo={navigateTo}
+            currentUser={currentUser}
+          />
           <NotificationBell />
         </div>
-        {/* Desktop topbar notification */}
-        <div className="hidden md:flex items-center justify-end px-4 py-2 bg-white border-b border-slate-100">
+        {/* Desktop topbar */}
+        <div className="hidden md:flex items-center justify-end gap-1 px-4 py-2 bg-white border-b border-slate-100">
+          <FavoritesButton navigateTo={navigateTo} currentUser={currentUser} />
+          <BookmarkButton
+            currentPath={currentPath}
+            navigateTo={navigateTo}
+            currentUser={currentUser}
+          />
           <NotificationBell />
         </div>
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          <AccessGuard />
         </main>
       </div>
     </div>

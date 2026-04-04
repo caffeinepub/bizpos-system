@@ -83,7 +83,36 @@ export default function OpeningBalancesPage() {
   };
 
   const handleSaveAll = () => {
-    saveAll(data.filter((d) => d.amount !== 0));
+    const toSave = data.filter((d) => d.amount !== 0);
+    saveAll(toSave);
+    // Update COA account balances for account-type entries
+    try {
+      const coaAccounts = JSON.parse(
+        localStorage.getItem("bizpos_accounts") || "[]",
+      );
+      const updatedAccounts = coaAccounts.map(
+        (acc: {
+          id: string;
+          openingBalance: number;
+          currentBalance: number;
+        }) => {
+          const ob = toSave.find(
+            (d) => d.entityId === acc.id && d.entityType === "account",
+          );
+          if (ob) {
+            return {
+              ...acc,
+              openingBalance: ob.amount,
+              currentBalance: ob.amount,
+            };
+          }
+          return acc;
+        },
+      );
+      localStorage.setItem("bizpos_accounts", JSON.stringify(updatedAccounts));
+    } catch {
+      /* ignore */
+    }
     toast.success("Opening balances saved");
   };
 

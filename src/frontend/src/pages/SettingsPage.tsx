@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Settings } from "lucide-react";
+import { Lock, Save, Settings } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
@@ -20,6 +20,7 @@ const CURRENCIES = ["PKR", "USD", "EUR", "GBP", "SAR", "AED", "INR"];
 export default function SettingsPage() {
   const { settings, updateSettings } = useStore();
   const [form, setForm] = useState({ ...settings });
+  const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
 
   const handleSave = () => {
     updateSettings(form);
@@ -39,6 +40,47 @@ export default function SettingsPage() {
       localStorage.removeItem(k);
     }
     window.location.reload();
+  };
+
+  const handlePasswordChange = () => {
+    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) {
+      toast.error("All password fields are required");
+      return;
+    }
+    if (pwForm.newPw.length < 4) {
+      toast.error("New password must be at least 4 characters");
+      return;
+    }
+    if (pwForm.newPw !== pwForm.confirm) {
+      toast.error("New password and confirm password do not match");
+      return;
+    }
+    try {
+      const session = JSON.parse(
+        localStorage.getItem("bizpos_session") || "{}",
+      );
+      const userId = session.id;
+      const users = JSON.parse(localStorage.getItem("bizpos_users") || "[]");
+      const user = users.find(
+        (u: { id: string; password: string }) => u.id === userId,
+      );
+      if (!user) {
+        toast.error("User not found");
+        return;
+      }
+      if (user.password !== pwForm.current) {
+        toast.error("Current password is incorrect");
+        return;
+      }
+      const updatedUsers = users.map((u: { id: string }) =>
+        u.id === userId ? { ...u, password: pwForm.newPw } : u,
+      );
+      localStorage.setItem("bizpos_users", JSON.stringify(updatedUsers));
+      setPwForm({ current: "", newPw: "", confirm: "" });
+      toast.success("Password changed successfully");
+    } catch {
+      toast.error("Failed to update password");
+    }
   };
 
   return (
@@ -145,6 +187,63 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            Security
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">Change your account password.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Current Password</Label>
+              <Input
+                type="password"
+                value={pwForm.current}
+                onChange={(e) =>
+                  setPwForm((p) => ({ ...p, current: e.target.value }))
+                }
+                placeholder="Current password"
+                data-ocid="settings.input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={pwForm.newPw}
+                onChange={(e) =>
+                  setPwForm((p) => ({ ...p, newPw: e.target.value }))
+                }
+                placeholder="Min 4 characters"
+                data-ocid="settings.input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm New Password</Label>
+              <Input
+                type="password"
+                value={pwForm.confirm}
+                onChange={(e) =>
+                  setPwForm((p) => ({ ...p, confirm: e.target.value }))
+                }
+                placeholder="Repeat new password"
+                data-ocid="settings.input"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={handlePasswordChange}
+            data-ocid="settings.save_button"
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Update Password
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-red-600">Developer Tools</CardTitle>

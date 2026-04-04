@@ -85,6 +85,34 @@ export default function POSPage() {
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
   const initialized = useRef(false);
 
+  // Auto-apply customer group discount
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    try {
+      const allCustomers = JSON.parse(
+        localStorage.getItem("bizpos_customers") || "[]",
+      );
+      const customer = allCustomers.find(
+        (c: { id: string }) => c.id === selectedCustomer,
+      );
+      if (!customer?.customerGroupId) return;
+      const groups = JSON.parse(
+        localStorage.getItem("bizpos_customer_groups") || "[]",
+      );
+      const group = groups.find(
+        (g: { id: string }) => g.id === customer.customerGroupId,
+      );
+      if (group && group.discount > 0) {
+        setDiscount((prev) => {
+          if (prev === "0" || prev === "") return String(group.discount);
+          return prev;
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [selectedCustomer]);
+
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;

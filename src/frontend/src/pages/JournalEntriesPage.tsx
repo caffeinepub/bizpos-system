@@ -164,6 +164,39 @@ export default function JournalEntriesPage() {
       description: form.description,
       lines,
     });
+    // Update COA account balances
+    try {
+      const coaAccounts = JSON.parse(
+        localStorage.getItem("bizpos_accounts") || "[]",
+      );
+      const updatedAccounts = coaAccounts.map(
+        (acc: { id: string; type: string; currentBalance: number }) => {
+          for (const line of lines) {
+            if (line.accountId !== acc.id) continue;
+            const isDebitNormal =
+              acc.type === "Asset" ||
+              acc.type === "Expense" ||
+              acc.type === "COGS";
+            let balance = acc.currentBalance;
+            if (line.debit > 0) {
+              balance = isDebitNormal
+                ? balance + line.debit
+                : balance - line.debit;
+            }
+            if (line.credit > 0) {
+              balance = isDebitNormal
+                ? balance - line.credit
+                : balance + line.credit;
+            }
+            return { ...acc, currentBalance: balance };
+          }
+          return acc;
+        },
+      );
+      localStorage.setItem("bizpos_accounts", JSON.stringify(updatedAccounts));
+    } catch {
+      /* ignore */
+    }
     toast.success("Journal entry saved");
     setDialogOpen(false);
     setForm({

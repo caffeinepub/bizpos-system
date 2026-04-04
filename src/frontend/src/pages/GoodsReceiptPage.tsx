@@ -404,9 +404,38 @@ export default function GoodsReceiptPage() {
                             variant="ghost"
                             className="text-blue-600"
                             onClick={() =>
-                              store.updateGoodsReceiptNote(g.id, {
-                                status: "Received",
-                              })
+                              (() => {
+                                store.updateGoodsReceiptNote(g.id, {
+                                  status: "Received",
+                                });
+                                // Update stock
+                                try {
+                                  const items = JSON.parse(
+                                    localStorage.getItem("bizpos_items") ||
+                                      "[]",
+                                  );
+                                  const updated = items.map(
+                                    (it: { id: string; quantity: number }) => {
+                                      const grnItem = g.items.find(
+                                        (gi) => gi.productId === it.id,
+                                      );
+                                      if (grnItem)
+                                        return {
+                                          ...it,
+                                          quantity:
+                                            it.quantity + grnItem.receivedQty,
+                                        };
+                                      return it;
+                                    },
+                                  );
+                                  localStorage.setItem(
+                                    "bizpos_items",
+                                    JSON.stringify(updated),
+                                  );
+                                } catch {
+                                  /* ignore */
+                                }
+                              })()
                             }
                           >
                             Mark Received
@@ -432,9 +461,46 @@ export default function GoodsReceiptPage() {
                             variant="ghost"
                             className="text-green-600"
                             onClick={() =>
-                              store.updateGoodsReceiptNote(g.id, {
-                                status: "Accepted",
-                              })
+                              (() => {
+                                // Only update stock if not already done in Received step
+                                if (
+                                  g.status !== "Received" &&
+                                  g.status !== "Quality Checked"
+                                ) {
+                                  try {
+                                    const items = JSON.parse(
+                                      localStorage.getItem("bizpos_items") ||
+                                        "[]",
+                                    );
+                                    const updated = items.map(
+                                      (it: {
+                                        id: string;
+                                        quantity: number;
+                                      }) => {
+                                        const grnItem = g.items.find(
+                                          (gi) => gi.productId === it.id,
+                                        );
+                                        if (grnItem)
+                                          return {
+                                            ...it,
+                                            quantity:
+                                              it.quantity + grnItem.acceptedQty,
+                                          };
+                                        return it;
+                                      },
+                                    );
+                                    localStorage.setItem(
+                                      "bizpos_items",
+                                      JSON.stringify(updated),
+                                    );
+                                  } catch {
+                                    /* ignore */
+                                  }
+                                }
+                                store.updateGoodsReceiptNote(g.id, {
+                                  status: "Accepted",
+                                });
+                              })()
                             }
                           >
                             Accept

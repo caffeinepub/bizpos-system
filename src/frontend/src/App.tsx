@@ -76,7 +76,7 @@ import WarehouseSelectPage from "./pages/WarehouseSelectPage";
 import WarehouseStockPage from "./pages/WarehouseStockPage";
 import WarehousesPage from "./pages/WarehousesPage";
 
-// Ensure v9 seed data exists
+// Ensure v9 seed data exists (legacy - kept for existing data)
 (function ensureV9Seed() {
   if (localStorage.getItem("bizpos_seeded_v9")) return;
 
@@ -357,6 +357,161 @@ import WarehousesPage from "./pages/WarehousesPage";
   localStorage.setItem("bizpos_seeded_v9", "true");
 })();
 
+// V10 seed: update role permissions + add bank transactions
+(function ensureSeedV10() {
+  if (localStorage.getItem("bizpos_seeded_v10")) return;
+
+  const ALL_52_PERMS = [
+    "dashboard",
+    "reports",
+    "logs",
+    "settings",
+    "pos",
+    "sales",
+    "sales_returns",
+    "credit_notes",
+    "payments",
+    "customers",
+    "customer_groups",
+    "purchases",
+    "purchase_orders",
+    "purchase_returns",
+    "debit_notes",
+    "suppliers",
+    "taxes",
+    "discounts",
+    "promotions",
+    "inventory",
+    "stock_adjustment",
+    "warehouse_stock",
+    "companies",
+    "warehouse",
+    "shops",
+    "accounts",
+    "journal_entries",
+    "opening_balances",
+    "financial_years",
+    "expenses",
+    "expense_categories",
+    "bank_reconciliation",
+    "trial_balance",
+    "balance_sheet",
+    "profit_loss",
+    "employees",
+    "salary_processing",
+    "leave_management",
+    "departments",
+    "designations",
+    "allowance_types",
+    "salary_slips",
+    "shifts",
+    "shift_closing",
+    "attendance",
+    "supply_chain",
+    "purchase_requisitions",
+    "goods_receipt",
+    "inventory_transfers",
+    "shipments",
+    "supplier_performance",
+    "banking",
+    "tickets",
+    "users",
+    "roles",
+  ];
+
+  // Update roles
+  try {
+    const roles = JSON.parse(localStorage.getItem("bizpos_roles") || "[]");
+    const updatedRoles = roles.map(
+      (r: { name: string; permissions: string[] }) => {
+        if (r.name === "Admin") return { ...r, permissions: ALL_52_PERMS };
+        if (r.name === "Cashier")
+          return {
+            ...r,
+            permissions: ["dashboard", "pos", "sales", "payments"],
+          };
+        return r;
+      },
+    );
+    localStorage.setItem("bizpos_roles", JSON.stringify(updatedRoles));
+  } catch {
+    /* ignore */
+  }
+
+  // Ensure super user has correct flags
+  try {
+    const users = JSON.parse(localStorage.getItem("bizpos_users") || "[]");
+    const updatedUsers = users.map(
+      (u: {
+        email: string;
+        isSuperUser?: boolean;
+        assignedCompanyId?: string;
+        assignedWarehouseIds?: string[];
+        assignedShopIds?: string[];
+      }) => {
+        if (u.email === "superuser@bizpos.com") {
+          return {
+            ...u,
+            isSuperUser: true,
+            assignedCompanyId: null,
+            assignedWarehouseIds: [],
+            assignedShopIds: [],
+          };
+        }
+        return u;
+      },
+    );
+    localStorage.setItem("bizpos_users", JSON.stringify(updatedUsers));
+  } catch {
+    /* ignore */
+  }
+
+  // Seed bank transactions if not already seeded
+  if (
+    !localStorage.getItem("bizpos_bank_transactions") ||
+    JSON.parse(localStorage.getItem("bizpos_bank_transactions") || "[]")
+      .length === 0
+  ) {
+    localStorage.setItem(
+      "bizpos_bank_transactions",
+      JSON.stringify([
+        {
+          id: "bt1",
+          bankAccountId: "ba1",
+          date: "2026-03-01",
+          type: "Credit",
+          amount: 50000,
+          description: "Sales deposit",
+          reference: "DEP-001",
+          reconciled: false,
+        },
+        {
+          id: "bt2",
+          bankAccountId: "ba1",
+          date: "2026-03-05",
+          type: "Debit",
+          amount: 15000,
+          description: "Supplier payment",
+          reference: "CHQ-001",
+          reconciled: false,
+        },
+        {
+          id: "bt3",
+          bankAccountId: "ba1",
+          date: "2026-03-10",
+          type: "Credit",
+          amount: 30000,
+          description: "Customer payment",
+          reference: "DEP-002",
+          reconciled: false,
+        },
+      ]),
+    );
+  }
+
+  localStorage.setItem("bizpos_seeded_v10", "1");
+})();
+
 function isLoggedIn() {
   return !!localStorage.getItem("bizpos_session");
 }
@@ -388,7 +543,17 @@ const layoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "layout",
   beforeLoad: () => {
-    if (!isLoggedIn()) throw redirect({ to: "/" });
+    const raw = localStorage.getItem("bizpos_session");
+    if (!raw) throw redirect({ to: "/" });
+    try {
+      const session = JSON.parse(raw);
+      if (session.isSuperUser && !session.activeCompanyId) {
+        throw redirect({ to: "/company-select" });
+      }
+    } catch (e) {
+      if (e instanceof Error) throw redirect({ to: "/" });
+      throw e;
+    }
   },
   component: AppLayout,
 });
@@ -402,7 +567,15 @@ const companySelectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/company-select",
   beforeLoad: () => {
-    if (!isLoggedIn()) throw redirect({ to: "/" });
+    const raw = localStorage.getItem("bizpos_session");
+    if (!raw) throw redirect({ to: "/" });
+    try {
+      const session = JSON.parse(raw);
+      if (!session.isSuperUser) throw redirect({ to: "/dashboard" });
+    } catch (e) {
+      if (e instanceof Error) throw redirect({ to: "/" });
+      throw e;
+    }
   },
   component: CompanySelectPage,
 });

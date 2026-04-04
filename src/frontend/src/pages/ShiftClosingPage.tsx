@@ -75,10 +75,11 @@ export default function ShiftClosingPage() {
     (sc) => sc.shopId === selectedShopId && sc.status === "Open",
   );
 
-  // Compute today sales for open shift's shop
+  // Compute sales for open shift's shop and date
+  const shiftDate = openShift?.date ?? today;
   const todaySales = sales.filter((s) => {
     if (!openShift) return false;
-    return s.shopId === openShift.shopId && s.saleDate === today;
+    return s.shopId === openShift.shopId && s.saleDate === shiftDate;
   });
 
   const totalSalesAmount = todaySales.reduce((sum, s) => sum + s.total, 0);
@@ -94,7 +95,18 @@ export default function ShiftClosingPage() {
     } else salesByMode.push({ mode, amount: s.total, count: 1 });
   }
 
-  const cashSales = salesByMode.find((m) => m.mode === "Cash")?.amount ?? 0;
+  // Also compute from raw sales data filtering by paymentMethod
+  const rawCashSales = sales
+    .filter(
+      (s) =>
+        openShift &&
+        s.shopId === openShift.shopId &&
+        s.saleDate === shiftDate &&
+        s.saleType === "Cash",
+    )
+    .reduce((sum, s) => sum + s.total, 0);
+  const cashSales =
+    rawCashSales || (salesByMode.find((m) => m.mode === "Cash")?.amount ?? 0);
 
   const handleOpenShift = () => {
     if (!selectedShopId || !openingShiftId) {
