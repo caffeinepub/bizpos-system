@@ -70,6 +70,7 @@ export default function POSPage() {
     taxes,
     promotions,
     addSale,
+    addLog,
   } = useStore();
   const { currentUser, getAccessibleShopIds } = useAuth();
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
@@ -336,6 +337,11 @@ export default function POSPage() {
       saleDate: today,
       createdAt: new Date().toISOString(),
     });
+    addLog(
+      "POS",
+      "create",
+      `Sale ${saleId} completed — Total: ${total.toFixed(2)}`,
+    );
     toast.success(`Sale ${saleId} completed!`);
     setLastSale({
       id: saleId,

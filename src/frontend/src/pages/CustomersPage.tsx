@@ -74,6 +74,7 @@ export default function CustomersPage() {
     addCustomer,
     updateCustomer,
     deleteCustomer,
+    addLog,
   } = useStore();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -123,9 +124,11 @@ export default function CustomersPage() {
     const data = { ...form, groupName: grp?.name || "" };
     if (editingCustomer) {
       updateCustomer(editingCustomer.id, data);
+      addLog("Customers", "update", "Customer updated");
       toast.success("Customer updated");
     } else {
       addCustomer(data);
+      addLog("Customers", "create", "Customer created");
       toast.success("Customer added");
     }
     setDialogOpen(false);
@@ -601,6 +604,7 @@ export default function CustomersPage() {
             <AlertDialogAction
               onClick={() => {
                 deleteCustomer(deleteId!);
+                addLog("Customers", "delete", `Customer deleted: ${deleteId}`);
                 setDeleteId(null);
                 toast.success("Customer deleted");
               }}

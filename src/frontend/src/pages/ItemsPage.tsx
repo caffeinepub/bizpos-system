@@ -93,7 +93,8 @@ function BarcodeCanvas({ value }: { value: string }) {
 }
 
 export default function ItemsPage() {
-  const { items, warehouses, addItem, updateItem, deleteItem } = useStore();
+  const { items, warehouses, addItem, updateItem, deleteItem, addLog } =
+    useStore();
   const { currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [filterWarehouse, setFilterWarehouse] = useState("all");
@@ -190,9 +191,11 @@ export default function ItemsPage() {
     };
     if (editingItem) {
       updateItem(editingItem.id, itemData);
+      addLog("Inventory", "update", `Item updated: ${itemData.name}`);
       toast.success("Item updated");
     } else {
       addItem(itemData);
+      addLog("Inventory", "create", `Item created: ${itemData.name}`);
       toast.success("Item created");
     }
     setDialogOpen(false);
@@ -203,7 +206,10 @@ export default function ItemsPage() {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    for (const id of selectedIds) deleteItem(id);
+    for (const id of selectedIds) {
+      deleteItem(id);
+      addLog("Inventory", "delete", `Item deleted: ${id}`);
+    }
     setSelectedIds(new Set());
     toast.success(`Deleted ${selectedIds.size} items`);
   };
@@ -709,6 +715,7 @@ export default function ItemsPage() {
             <AlertDialogAction
               onClick={() => {
                 deleteItem(deleteId!);
+                addLog("Inventory", "delete", `Item deleted: ${deleteId}`);
                 setDeleteId(null);
                 toast.success("Item deleted");
               }}

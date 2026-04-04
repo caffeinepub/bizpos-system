@@ -97,6 +97,7 @@ export default function PurchasesPage() {
     addPurchase,
     updatePurchase,
     deletePurchase,
+    addLog,
   } = useStore();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -269,6 +270,7 @@ export default function PurchasesPage() {
         items: purchaseItems,
         total,
       });
+      addLog("Purchases", "update", "Purchase updated");
       toast.success("Purchase updated");
     } else {
       const id = `PUR-${String(purchases.length + 1).padStart(3, "0")}`;
@@ -285,6 +287,7 @@ export default function PurchasesPage() {
         status: form.status,
         createdAt: new Date().toISOString(),
       });
+      addLog("Purchases", "create", "Purchase created from supplier");
       toast.success("Purchase created");
     }
     setDialogOpen(false);
@@ -752,6 +755,7 @@ export default function PurchasesPage() {
             <AlertDialogAction
               onClick={() => {
                 deletePurchase(deleteId!);
+                addLog("Purchases", "delete", `Purchase deleted: ${deleteId}`);
                 setDeleteId(null);
                 toast.success("Purchase deleted");
               }}

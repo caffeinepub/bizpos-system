@@ -105,7 +105,8 @@ const EMPTY_FORM: FormState = {
 
 export default function EmployeesPage() {
   const { currentUser } = useAuth();
-  const { employees, addEmployee, updateEmployee, deleteEmployee } = useStore();
+  const { employees, addEmployee, updateEmployee, deleteEmployee, addLog } =
+    useStore();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Employee | null>(null);
@@ -233,9 +234,11 @@ export default function EmployeesPage() {
     }
     if (editing) {
       updateEmployee(editing.id, form);
+      addLog("Employees", "update", `Employee updated: ${form.name}`);
       toast.success("Employee updated");
     } else {
       addEmployee(form);
+      addLog("Employees", "create", `Employee added: ${form.name}`);
       toast.success("Employee added");
     }
     setSheetOpen(false);
@@ -243,6 +246,7 @@ export default function EmployeesPage() {
 
   const handleDelete = (id: string) => {
     deleteEmployee(id);
+    addLog("Employees", "delete", "Employee deleted");
     toast.success("Employee deleted");
     setDeleteId(null);
   };

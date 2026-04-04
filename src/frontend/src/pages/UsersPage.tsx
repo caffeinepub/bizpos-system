@@ -43,7 +43,7 @@ import { useStore } from "../store/useStore";
 import type { User } from "../store/useStore";
 
 export default function UsersPage() {
-  const { users, roles, addUser, updateUser, deleteUser } = useStore();
+  const { users, roles, addUser, updateUser, deleteUser, addLog } = useStore();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -169,6 +169,11 @@ export default function UsersPage() {
       };
       if (form.password) update.password = form.password;
       updateUser(editingUser.id, update);
+      addLog(
+        "Users",
+        "update",
+        `User updated: ${update.name || editingUser.name}`,
+      );
       toast.success("User updated successfully");
     } else {
       addUser({
@@ -184,6 +189,7 @@ export default function UsersPage() {
         assignedWarehouseIds: form.assignedWarehouseIds,
         assignedShopIds: form.isSuperUser ? [] : form.assignedShopIds,
       });
+      addLog("Users", "create", `User created: ${form.name}`);
       toast.success("User created successfully");
     }
     setDialogOpen(false);
@@ -651,6 +657,7 @@ export default function UsersPage() {
             <AlertDialogAction
               onClick={() => {
                 deleteUser(deleteId!);
+                addLog("Users", "delete", `User deleted: ${deleteId}`);
                 setDeleteId(null);
                 toast.success("User deleted");
               }}

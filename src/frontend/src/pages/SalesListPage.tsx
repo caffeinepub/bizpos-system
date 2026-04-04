@@ -42,7 +42,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SalesListPage() {
-  const { sales, warehouses, deleteSale } = useStore();
+  const { sales, warehouses, deleteSale, addLog } = useStore();
   const { currentUser, getAccessibleShopIds } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -356,6 +356,7 @@ export default function SalesListPage() {
             <AlertDialogAction
               onClick={() => {
                 deleteSale(deleteId!);
+                addLog("Sales", "delete", `Sale deleted: ${deleteId}`);
                 setDeleteId(null);
                 toast.success("Sale deleted");
               }}

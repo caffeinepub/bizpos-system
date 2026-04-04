@@ -20,6 +20,29 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
+function writeLog(
+  module: string,
+  action: string,
+  details: string,
+  userName: string,
+) {
+  try {
+    const entry = {
+      id: Math.random().toString(36).slice(2),
+      timestamp: new Date().toISOString(),
+      user: userName,
+      module,
+      action,
+      details,
+    };
+    const existing = JSON.parse(localStorage.getItem("bizpos_logs") || "[]");
+    localStorage.setItem(
+      "bizpos_logs",
+      JSON.stringify([...existing.slice(-999), entry]),
+    );
+  } catch {}
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +69,12 @@ export default function LoginPage() {
     const ok = login(email.trim(), password);
     setLoading(false);
     if (ok) {
+      writeLog(
+        "Auth",
+        "login",
+        `User logged in: ${email.trim()}`,
+        email.trim(),
+      );
       try {
         const session = JSON.parse(
           localStorage.getItem("bizpos_session") || "{}",

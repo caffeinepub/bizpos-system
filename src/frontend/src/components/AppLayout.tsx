@@ -148,7 +148,7 @@ const navGroups: NavGroup[] = [
     key: "pricing",
     label: "Pricing",
     icon: Percent,
-    module: "pricing",
+    module: "taxes",
     subItems: [
       { path: "/taxes", label: "Tax Rates", icon: Percent },
       { path: "/discounts", label: "Discounts", icon: Tag },
@@ -237,7 +237,7 @@ const navGroups: NavGroup[] = [
     key: "supplychain",
     label: "Supply Chain",
     icon: Truck,
-    module: "supply_chain",
+    module: "purchase_requisitions",
     subItems: [
       {
         path: "/purchase-requisitions",
@@ -263,7 +263,7 @@ const navGroups: NavGroup[] = [
     key: "banking",
     label: "Banking",
     icon: Landmark,
-    module: "banking",
+    module: "banks",
     subItems: [
       { path: "/banks", label: "Banks", icon: Building2 },
       { path: "/bank-branches", label: "Branches", icon: MapPin },
