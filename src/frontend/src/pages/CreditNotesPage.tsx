@@ -79,7 +79,8 @@ function save(data: CreditNote[]) {
 }
 
 export default function CreditNotesPage() {
-  const { customers, items, adjustStock } = useStore();
+  const { customers, items, adjustStock, postJournalEntry, accountMapping } =
+    useStore();
   const { currentUser } = useAuth();
   const [notes, setNotes] = useState<CreditNote[]>(load);
   const [search, setSearch] = useState("");
@@ -227,6 +228,29 @@ export default function CreditNotesPage() {
         for (const item of form.items) {
           adjustStock(item.itemId, item.qty);
         }
+        // Post journal: Dr Sales Revenue / Cr Accounts Receivable
+        const salesRevId =
+          accountMapping?.salesRevenueId || "acc-400-01-01-0001";
+        const arId = accountMapping?.accountsReceivableId || "acc-100-02-04";
+        postJournalEntry?.({
+          date: newNote.date,
+          reference: newNote.noteNumber,
+          description: `Credit Note ${newNote.noteNumber} - ${newNote.customerName}`,
+          lines: [
+            {
+              accountId: salesRevId,
+              accountName: "PRODUCT SALES",
+              debit: totalAmount,
+              credit: 0,
+            },
+            {
+              accountId: arId,
+              accountName: "ACCOUNTS RECEIVABLE",
+              debit: 0,
+              credit: totalAmount,
+            },
+          ],
+        });
       }
       save([...existing, newNote]);
       toast.success("Credit note created");
@@ -251,6 +275,28 @@ export default function CreditNotesPage() {
     for (const item of n.items) {
       adjustStock(item.itemId, item.qty);
     }
+    // Post journal: Dr Sales Revenue / Cr Accounts Receivable
+    const salesRevId = accountMapping?.salesRevenueId || "acc-400-01-01-0001";
+    const arId = accountMapping?.accountsReceivableId || "acc-100-02-04";
+    postJournalEntry?.({
+      date: n.date,
+      reference: n.noteNumber,
+      description: `Credit Note ${n.noteNumber} - ${n.customerName}`,
+      lines: [
+        {
+          accountId: salesRevId,
+          accountName: "PRODUCT SALES",
+          debit: n.totalAmount,
+          credit: 0,
+        },
+        {
+          accountId: arId,
+          accountName: "ACCOUNTS RECEIVABLE",
+          debit: 0,
+          credit: n.totalAmount,
+        },
+      ],
+    });
     save(updated);
     reload();
     toast.success("Credit note posted — stock restocked");

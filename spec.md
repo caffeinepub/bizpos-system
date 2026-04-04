@@ -1,81 +1,79 @@
-# BizPOS System — Chart of Accounts Full Integration
+# BizPOS System — Full Workflow Audit & Fix
 
 ## Current State
 
-The BizPOS system has a functional Chart of Accounts (COA) with a 4-level hierarchy, and a Journal Entries module where accountants can post manual Dr/Cr entries. The Trial Balance, P&L, and Balance Sheet all read from `journalEntries` (for Trial Balance) or `account.currentBalance` (for P&L and Balance Sheet).
+BizPOS is a comprehensive frontend-only POS/ERP system with 63+ screens covering sales, purchases, inventory, accounting (COA), banking, HR/payroll, supply chain, and reporting. Data is persisted in localStorage under `bizpos_*` keys. The system uses an auto-posting engine (`postAutoJournal`) in `useStore.ts` to create double-entry journal entries and update `currentBalance` on COA accounts whenever transactions occur.
 
-**Critical gaps identified:**
-- `addSale`, `addPurchase`, `addPayment`, `addExpense`, `addPayroll`, `addBankTransaction`, and `updateGoodsReceiptNote` do NOT auto-generate journal entries in the COA.
-- `account.currentBalance` on P&L/Balance Sheet is static seed data — it does not reflect live transactions.
-- Items and Item Categories have no account mapping fields (Inventory Asset account, COGS account, Sales Revenue account).
-- There is no system-wide default account mapping config (e.g., which account is the default Cash account, A/R, A/P, etc.).
-- The Trial Balance only works if journal entries exist; P&L and Balance Sheet use stale `currentBalance` fields instead of live journal-entry aggregation.
-- Payroll processing does not post to Salaries Expense / Salaries Payable accounts.
-- Bank transactions do not create corresponding journal entries.
-- Expenses posted to the Expenses module do not auto-create journal entries.
-- Returns (sales/purchase returns, credit notes, debit notes) do not reverse journal entries.
+## Audit Findings — Issues to Fix
+
+### Critical Data Flow Breaks
+
+1. **Credit Notes (Sales Returns) — no accounting integration**: When a credit note is posted, it restocks inventory (`adjustStock`) but does NOT post any journal entry. Standard: Dr Sales Revenue / Cr Accounts Receivable (reversal of original sale).
+
+2. **Debit Notes (Purchase Returns) — no accounting integration**: When a debit note is posted, it removes stock (`adjustStock(-qty)`) but does NOT post any journal entry. Standard: Dr Accounts Payable / Cr Inventory Asset.
+
+3. **GRN (Goods Receipt Note) — no journal or stock update**: When GRN status becomes Accepted/Partially Accepted, neither the inventory stock nor any journal entry is updated. The store's `addGoodsReceiptNote` / `updateGoodsReceiptNote` have no accounting or stock logic.
+
+4. **Opening Balances — wrong localStorage key**: `OpeningBalancesPage` writes to `bizpos_accounts_v3` but the store uses `KEYS.accounts = 'bizpos_accounts_v3'` — this is actually correct. However the page directly writes to localStorage bypassing `updateAccount`, so `postAutoJournal` is never called and the `currentBalance` field is updated but `openingBalance` changes don't cascade.
+
+5. **Supplier Payments — no dedicated workflow**: The `ReceivePaymentPage` only handles customer payments (sale outstanding balance). There is no UI or workflow for recording supplier payments (settling purchase invoices / Accounts Payable). Standard: Dr Accounts Payable / Cr Cash.
+
+6. **Inventory Transfers — stock not actually updated**: When a transfer is completed, `addStockMovement` records the log entries but the actual `item.quantity` is never decremented from the source warehouse or incremented in the destination warehouse. The items stay with their original quantities.
+
+7. **Stock Adjustment — no journal entry**: Adjustments record a stock movement log and update `item.quantity` but don't post a journal entry. Standard: Dr/Cr Inventory Asset / Cr/Dr Inventory Adjustment (Expense).
+
+8. **Payroll to Salary Slip — disconnected**: `addPayroll` auto-posts journal (Dr Salary Expense / Cr Salaries Payable) when Finalized, but `addSalarySlip` (individual slip) has no journal posting and the two are not linked.
+
+9. **Payment to Sale: wrong journal when sale type is Cash**: When a Cash sale is completed, the POS posts Dr Cash / Cr Revenue (correct). But if a separate payment is then recorded via ReceivePaymentPage for that same sale, it posts Dr Cash / Cr AR again — double-counting. The payment page should only handle Credit sales that have a balance due.
+
+10. **GRN stock movement `quantityAfter` is always 0**: The transfer completion block sets `quantityAfter: 0` instead of computing the real post-transfer quantity.
+
+11. **Export headers use hardcoded "BizPOS System"** instead of the active company name in several pages (PurchasesPage, etc.).
+
+12. **Seed data version key**: The latest seed data uses `bizpos_seeded_v14`. Need to bump to `bizpos_seeded_v15` to re-seed with any corrections.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `AccountMapping` interface and localStorage key `bizpos_account_mapping` — system-wide default account assignments (Cash, Bank, A/R, A/P, Inventory, COGS, Sales Revenue, Sales Tax Payable, Salary Expense, Salary Payable, Purchase Expense)
-- `AccountMappingPage` at `/account-mapping` — UI for admins to configure default account mappings
-- Auto-posting engine: `postAutoJournal(entry)` helper in useStore that creates a JournalEntry AND updates `currentBalance` on affected accounts simultaneously
-- `inventoryAccountId`, `cogsAccountId`, `salesAccountId` fields on `ItemCategory` interface
-- Account mapping fields on Item Categories page — dropdowns to map categories to Inventory, COGS, and Sales Revenue accounts
-- Seed data updates: wire existing seed accounts to the mapping config with sensible defaults
-- New seed leaf accounts: `ACCOUNTS RECEIVABLE` (Asset), `ACCOUNTS PAYABLE` (Liability, already exists as `acc-300-02-01-0001`), `SALES TAX PAYABLE` (Liability), `INVENTORY ASSET` (Asset), `PURCHASE EXPENSES` (Expense)
+- Supplier payment recording in the store: new `addSupplierPayment(payment)` function that posts Dr AP / Cr Cash journal automatically
+- Supplier payments tab/section in PaymentHistoryPage or a new `/supplier-payments` route
+- Stock Adjustment journal posting in `adjustStock` or in StockAdjustmentPage on save
+- GRN acceptance journal + stock update in `updateGoodsReceiptNote` when status transitions to Accepted
+- `postJournalEntry` exported helper function so CreditNotesPage and DebitNotesPage can call it without going through `useStore` (they manage their own localStorage directly)
 
 ### Modify
-- `addSale` in useStore: after saving sale, call `postAutoJournal` to create:
-  - Dr Accounts Receivable (or Cash if cash sale) / Cr Sales Revenue (by category mapping)
-  - Dr COGS / Cr Inventory Asset (by category mapping)
-  - Dr Sales Revenue / Cr Sales Tax Payable (for tax portion)
-- `addPurchase` / `updatePurchase` (when status → Received): call `postAutoJournal`:
-  - Dr Inventory Asset / Cr Accounts Payable
-- `addPayment` (customer payment received): call `postAutoJournal`:
-  - Dr Cash/Bank / Cr Accounts Receivable
-- `addExpense`: call `postAutoJournal`:
-  - Dr Expense Account (from expense.accountId) / Cr Cash (from payment method)
-- `addPayroll` / finalize payroll: call `postAutoJournal`:
-  - Dr Salary Expense / Cr Salary Payable
-  - On payment: Dr Salary Payable / Cr Cash/Bank
-- `addBankTransaction`: call `postAutoJournal`:
-  - Deposit: Dr Bank Account / Cr mapped source account
-  - Withdrawal: Dr mapped target account / Cr Bank Account
-- `updateGoodsReceiptNote` (status → Confirmed): call `postAutoJournal`:
-  - Dr Inventory Asset / Cr Accounts Payable
-- `addSalesReturn` / `addCreditNote`: reverse the original sale journal entry
-- `addPurchaseReturn` / `addDebitNote`: reverse the original purchase journal entry
-- `ItemCategory` interface: add `inventoryAccountId`, `cogsAccountId`, `salesAccountId` optional fields
-- `TrialBalancePage`: already reads from journalEntries — now will have real data
-- `ProfitLossPage`: switch from `account.currentBalance` to live aggregation from journalEntries grouped by account type
-- `BalanceSheetPage`: switch from `account.currentBalance` to live aggregation from journalEntries
-- `ChartOfAccountsPage`: show a "running balance" computed from journalEntries rather than the static `currentBalance` field
-- `ItemCategoriesPage`: add account mapping dropdowns
-- Sidebar: add Account Mapping link under Accounting group
-- Seed data: bump to `bizpos_seeded_v14`, add missing leaf accounts, wire default account mapping
+- `useStore.ts` — `updateGoodsReceiptNote`: when status changes to Accepted or Partially Accepted, increment inventory and post Dr Inventory / Cr AP journal
+- `useStore.ts` — `updateInventoryTransfer`: when status changes to Completed, decrement source warehouse items and increment destination warehouse items (currently only logs movements, doesn't update quantities)
+- `useStore.ts` — expose `postAutoJournal` as `postJournalEntry` in the return object so external pages can call it
+- `CreditNotesPage.tsx` — on post: call `postJournalEntry(Dr AR / Cr Revenue)` via store
+- `DebitNotesPage.tsx` — on post: call `postJournalEntry(Dr AP / Cr Inventory)` via store
+- `OpeningBalancesPage.tsx` — on save: use store `updateAccount` for each account entry so balance cascades properly; also save opening balance for customers/suppliers
+- `ReceivePaymentPage.tsx` — add validation to only show credit sales (balanceDue > 0), and also add a separate section for supplier payments with a purchase selector
+- `StockAdjustmentPage.tsx` — on save: call `postJournalEntry` for the adjustment (Dr Inventory / Cr Expense or vice versa)
+- `InventoryTransfersPage.tsx` — on Complete: also update item quantities (decrement from source, increment to destination)
+- All export headers: use active company name from store settings
 
 ### Remove
-- Nothing removed; all existing functionality preserved
+- Nothing is removed
 
 ## Implementation Plan
 
-1. **Add `AccountMapping` interface and KEYS.accountMapping** to useStore
-2. **Add `postAutoJournal` helper** in useStore — creates JournalEntry AND updates `currentBalance` on each affected account in a single atomic localStorage operation
-3. **Add `getDefaultAccountMapping` / `saveAccountMapping`** functions exposed from useStore
-4. **Update `ItemCategory` interface** with optional account mapping fields
-5. **Modify `addSale`** to call `postAutoJournal` with correct Dr/Cr lines using category account mappings
-6. **Modify `addPurchase` / `updatePurchase`** to call `postAutoJournal` on receive
-7. **Modify `addPayment`** to call `postAutoJournal` (Dr Cash/Bank, Cr A/R)
-8. **Modify `addExpense`** to call `postAutoJournal` (Dr Expense Account, Cr Cash)
-9. **Modify `addPayroll`** to call `postAutoJournal` (Dr Salary Expense, Cr Salary Payable)
-10. **Modify `addBankTransaction`** to call `postAutoJournal`
-11. **Modify `updateGoodsReceiptNote`** to call `postAutoJournal` on confirmation
-12. **Update `ProfitLossPage`** and **`BalanceSheetPage`** to compute balances live from journalEntries
-13. **Create `AccountMappingPage`** with dropdowns for each system account role
-14. **Update `ItemCategoriesPage`** with account mapping columns
-15. **Add new leaf accounts** to seed data (A/R, Inventory Asset, Sales Tax Payable)
-16. **Add default account mapping** to seed data
-17. **Bump seed key** to `bizpos_seeded_v14`
-18. **Add Account Mapping route and sidebar link**
+1. **useStore.ts changes**:
+   - In `updateGoodsReceiptNote`: detect status transition to Accepted/Partially Accepted → increment accepted qty on items → post Dr Inventory / Cr AP journal
+   - In `updateInventoryTransfer`: detect status transition to Completed → update item quantities (decrement source, increment destination)
+   - Export `postAutoJournal` as `postJournalEntry` in the return object
+   - Add `addSupplierPayment(payment)` action that saves to `bizpos_supplier_payments` and posts Dr AP / Cr Cash journal
+
+2. **CreditNotesPage.tsx**: on posting, call `store.postJournalEntry` with Dr Accounts Receivable reversal / Cr Sales Revenue reversal (negative sale reversal)
+
+3. **DebitNotesPage.tsx**: on posting, call `store.postJournalEntry` with Dr Accounts Payable / Cr Inventory Asset
+
+4. **StockAdjustmentPage.tsx**: on save, call `store.postJournalEntry` for the inventory adjustment
+
+5. **InventoryTransfersPage.tsx**: on Complete action, also update `item.quantity` using `store.updateItem` for affected items
+
+6. **OpeningBalancesPage.tsx**: fix to call `store.updateAccount` for each account entry, bypassing direct localStorage writes
+
+7. **PaymentHistoryPage.tsx / ReceivePaymentPage.tsx**: add supplier payment section that selects a purchase invoice and records the payment with proper AP journal entry
+
+8. Bump seed version to `bizpos_seeded_v15`

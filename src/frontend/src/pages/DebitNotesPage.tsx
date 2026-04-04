@@ -77,7 +77,8 @@ function save(data: DebitNote[]) {
 }
 
 export default function DebitNotesPage() {
-  const { suppliers, items, adjustStock } = useStore();
+  const { suppliers, items, adjustStock, postJournalEntry, accountMapping } =
+    useStore();
   const { currentUser } = useAuth();
   const [notes, setNotes] = useState<DebitNote[]>(load);
   const [search, setSearch] = useState("");
@@ -224,6 +225,28 @@ export default function DebitNotesPage() {
         for (const item of form.items) {
           adjustStock(item.itemId, -item.qty);
         }
+        // Post journal: Dr Accounts Payable / Cr Inventory Asset
+        const apId = accountMapping?.accountsPayableId || "acc-300-02-01-0001";
+        const invId = accountMapping?.inventoryAssetId || "acc-100-02-03";
+        postJournalEntry?.({
+          date: newNote.date,
+          reference: newNote.noteNumber,
+          description: `Debit Note ${newNote.noteNumber} - ${newNote.supplierName}`,
+          lines: [
+            {
+              accountId: apId,
+              accountName: "ACCOUNTS PAYABLE",
+              debit: totalAmount,
+              credit: 0,
+            },
+            {
+              accountId: invId,
+              accountName: "STOCK IN HAND",
+              debit: 0,
+              credit: totalAmount,
+            },
+          ],
+        });
       }
       save([...all, newNote]);
       toast.success("Debit note created");
@@ -248,6 +271,28 @@ export default function DebitNotesPage() {
     for (const item of n.items) {
       adjustStock(item.itemId, -item.qty);
     }
+    // Post journal: Dr Accounts Payable / Cr Inventory Asset
+    const apId = accountMapping?.accountsPayableId || "acc-300-02-01-0001";
+    const invId = accountMapping?.inventoryAssetId || "acc-100-02-03";
+    postJournalEntry?.({
+      date: n.date,
+      reference: n.noteNumber,
+      description: `Debit Note ${n.noteNumber} - ${n.supplierName}`,
+      lines: [
+        {
+          accountId: apId,
+          accountName: "ACCOUNTS PAYABLE",
+          debit: n.totalAmount,
+          credit: 0,
+        },
+        {
+          accountId: invId,
+          accountName: "STOCK IN HAND",
+          debit: 0,
+          credit: n.totalAmount,
+        },
+      ],
+    });
     save(updated);
     reload();
     toast.success("Debit note posted — stock reduced");

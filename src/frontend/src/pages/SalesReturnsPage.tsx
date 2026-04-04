@@ -34,7 +34,7 @@ function loadCreditNotes(): CreditNote[] {
 }
 
 export default function SalesReturnsPage() {
-  const { customers } = useStore();
+  const { customers, settings } = useStore();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [notes] = useState<CreditNote[]>(loadCreditNotes);
@@ -74,7 +74,7 @@ export default function SalesReturnsPage() {
       rows,
       "sales-returns.pdf",
       {
-        companyName: "BizPOS",
+        companyName: settings?.companyName || "BizPOS",
         reportTitle: "Sales Returns",
         generatedBy: currentUser?.name,
       },
@@ -97,7 +97,7 @@ export default function SalesReturnsPage() {
       ["Note#", "Date", "Customer", "Sale Ref", "Amount", "Reason", "Status"],
       rows,
       {
-        companyName: "BizPOS",
+        companyName: settings?.companyName || "BizPOS",
         reportTitle: "Sales Returns",
         generatedBy: currentUser?.name,
       },

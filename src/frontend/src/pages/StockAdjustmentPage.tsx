@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUpDown, CheckCircle } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "../store/useStore";
@@ -26,7 +26,14 @@ interface AdjustmentLog {
 }
 
 export default function StockAdjustmentPage() {
-  const { items, warehouses, adjustStock, addStockMovement } = useStore();
+  const {
+    items,
+    warehouses,
+    adjustStock,
+    addStockMovement,
+    postJournalEntry,
+    accountMapping,
+  } = useStore();
   const [warehouseId, setWarehouseId] = useState("all");
   const [itemId, setItemId] = useState("");
   const [adjustType, setAdjustType] = useState<"Add" | "Remove">("Add");
@@ -67,17 +74,68 @@ export default function StockAdjustmentPage() {
     const newQty = selectedItem
       ? Math.max(0, selectedItem.quantity + adjustmentQty)
       : 0;
+    const adjRef = `ADJ-${Date.now()}`;
     addStockMovement({
       itemId,
       itemName: selectedItem?.name || "",
       type: "Adjustment",
-      reference: `ADJ-${Date.now()}`,
+      reference: adjRef,
       quantityChange: adjustmentQty,
       quantityAfter: newQty,
       warehouseId: selectedItem?.warehouseId || "",
       warehouseName,
       notes: reason || "Manual adjustment",
     });
+
+    // Post journal entry for the cost value of the adjustment
+    const costValue = (selectedItem?.costPrice ?? 0) * qty;
+    if (costValue !== 0 && postJournalEntry) {
+      const invId = accountMapping?.inventoryAssetId || "acc-100-02-03";
+      const adjAccountId = "acc-600-01-04";
+      const today = new Date().toISOString().slice(0, 10);
+      if (adjustType === "Add") {
+        postJournalEntry({
+          date: today,
+          reference: adjRef,
+          description: `Stock Adjustment (Add): ${selectedItem?.name}`,
+          lines: [
+            {
+              accountId: invId,
+              accountName: "STOCK IN HAND",
+              debit: costValue,
+              credit: 0,
+            },
+            {
+              accountId: adjAccountId,
+              accountName: "INVENTORY ADJUSTMENT",
+              debit: 0,
+              credit: costValue,
+            },
+          ],
+        });
+      } else {
+        postJournalEntry({
+          date: today,
+          reference: adjRef,
+          description: `Stock Adjustment (Remove): ${selectedItem?.name}`,
+          lines: [
+            {
+              accountId: adjAccountId,
+              accountName: "INVENTORY ADJUSTMENT",
+              debit: costValue,
+              credit: 0,
+            },
+            {
+              accountId: invId,
+              accountName: "STOCK IN HAND",
+              debit: 0,
+              credit: costValue,
+            },
+          ],
+        });
+      }
+    }
+
     setLogs((prev) => [
       {
         id: Date.now().toString(),
@@ -154,6 +212,11 @@ export default function StockAdjustmentPage() {
               <div className="p-3 bg-blue-50 rounded-lg text-sm">
                 <span className="text-gray-600">Current Stock:</span>{" "}
                 <strong>{selectedItem.quantity}</strong>
+                {selectedItem.costPrice ? (
+                  <span className="ml-4 text-gray-500">
+                    Cost Price: {selectedItem.costPrice.toLocaleString()}
+                  </span>
+                ) : null}
               </div>
             )}
             <div className="space-y-2">

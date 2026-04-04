@@ -98,6 +98,7 @@ export default function PurchasesPage() {
     updatePurchase,
     deletePurchase,
     addLog,
+    settings,
   } = useStore();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -130,7 +131,7 @@ export default function PurchasesPage() {
       filterStatus !== "all" && { label: "Status", value: filterStatus },
     ].filter(Boolean) as { label: string; value: string }[];
     return {
-      companyName: "BizPOS System",
+      companyName: settings?.companyName || "BizPOS System",
       generatedBy: currentUser?.name ?? "Unknown",
       filters,
     };

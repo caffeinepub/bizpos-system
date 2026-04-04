@@ -2918,7 +2918,7 @@ const KEYS = {
   itemUnits: "bizpos_item_units",
   stockMovements: "bizpos_stock_movements",
   accountMapping: "bizpos_account_mapping",
-  seeded: "bizpos_seeded_v14",
+  seeded: "bizpos_seeded_v15",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -5412,14 +5412,84 @@ export function useStore() {
   );
   const updateGoodsReceiptNote = useCallback(
     (id: string, grn: Partial<GoodsReceiptNote>) => {
+      const existing = load<GoodsReceiptNote[]>(KEYS.goodsReceiptNotes, []);
+      const old = existing.find((x) => x.id === id);
       save(
         KEYS.goodsReceiptNotes,
-        load<GoodsReceiptNote[]>(KEYS.goodsReceiptNotes, []).map((x) =>
-          x.id === id ? { ...x, ...grn } : x,
-        ),
+        existing.map((x) => (x.id === id ? { ...x, ...grn } : x)),
       );
+      // When status transitions to Accepted or Partially Accepted, update stock and post journal
+      if (
+        old &&
+        grn.status &&
+        old.status !== grn.status &&
+        (grn.status === "Accepted" || grn.status === "Partially Accepted")
+      ) {
+        const merged: GoodsReceiptNote = { ...old, ...grn } as GoodsReceiptNote;
+        const currentItems = load<Item[]>(KEYS.items, []);
+        const mapping = load<AccountMapping>(
+          "bizpos_account_mapping",
+          {} as AccountMapping,
+        );
+        const accs = load<Account[]>(KEYS.accounts, []);
+        const invId = mapping.inventoryAssetId || "acc-100-02-03";
+        const apId = mapping.accountsPayableId || "acc-300-02-01-0001";
+        const invAcc = accs.find((a) => a.id === invId);
+        const apAcc = accs.find((a) => a.id === apId);
+        let totalAcceptedValue = 0;
+        // Update item quantities for accepted qty
+        const updatedItems = currentItems.map((item) => {
+          const grnItem = merged.items?.find((gi) => gi.productId === item.id);
+          if (grnItem && grnItem.acceptedQty > 0) {
+            totalAcceptedValue += grnItem.acceptedQty * grnItem.unitCost;
+            return { ...item, quantity: item.quantity + grnItem.acceptedQty };
+          }
+          return item;
+        });
+        save(KEYS.items, updatedItems);
+        // Record stock movements
+        for (const grnItem of merged.items || []) {
+          if (grnItem.acceptedQty > 0) {
+            addStockMovement({
+              itemId: grnItem.productId,
+              itemName: grnItem.productName,
+              type: "GRN",
+              reference: merged.grnNo,
+              quantityChange: grnItem.acceptedQty,
+              quantityAfter:
+                (currentItems.find((i) => i.id === grnItem.productId)
+                  ?.quantity ?? 0) + grnItem.acceptedQty,
+              warehouseId: merged.warehouseId,
+              warehouseName: merged.warehouseName,
+              notes: `GRN ${merged.grnNo} accepted from ${merged.supplierName}`,
+            });
+          }
+        }
+        // Post journal: Dr Inventory Asset / Cr Accounts Payable
+        if (totalAcceptedValue > 0) {
+          postAutoJournal({
+            date: merged.receivedDate,
+            reference: merged.grnNo,
+            description: `GRN ${merged.grnNo} accepted from ${merged.supplierName}`,
+            lines: [
+              {
+                accountId: invId,
+                accountName: invAcc?.name || "STOCK IN HAND",
+                debit: totalAcceptedValue,
+                credit: 0,
+              },
+              {
+                accountId: apId,
+                accountName: apAcc?.name || "ACCOUNTS PAYABLE",
+                debit: 0,
+                credit: totalAcceptedValue,
+              },
+            ],
+          });
+        }
+      }
     },
-    [],
+    [addStockMovement, postAutoJournal],
   );
   const deleteGoodsReceiptNote = useCallback((id: string) => {
     save(
@@ -5448,12 +5518,41 @@ export function useStore() {
   );
   const updateInventoryTransfer = useCallback(
     (id: string, t: Partial<InventoryTransfer>) => {
+      const existing = load<InventoryTransfer[]>(KEYS.inventoryTransfers, []);
+      const old = existing.find((x) => x.id === id);
       save(
         KEYS.inventoryTransfers,
-        load<InventoryTransfer[]>(KEYS.inventoryTransfers, []).map((x) =>
-          x.id === id ? { ...x, ...t } : x,
-        ),
+        existing.map((x) => (x.id === id ? { ...x, ...t } : x)),
       );
+      // When status transitions to Completed, update item quantities in both warehouses
+      if (
+        old &&
+        t.status &&
+        old.status !== t.status &&
+        t.status === "Completed"
+      ) {
+        const merged: InventoryTransfer = { ...old, ...t } as InventoryTransfer;
+        const currentItems = load<Item[]>(KEYS.items, []);
+        const updatedItems = currentItems.map((item) => {
+          const transferItem = merged.items?.find(
+            (ti) => ti.productId === item.id,
+          );
+          if (!transferItem) return item;
+          // Decrement from source warehouse
+          if (item.warehouseId === merged.fromWarehouseId) {
+            return {
+              ...item,
+              quantity: Math.max(0, item.quantity - transferItem.qty),
+            };
+          }
+          // Increment in destination warehouse
+          if (item.warehouseId === merged.toWarehouseId) {
+            return { ...item, quantity: item.quantity + transferItem.qty };
+          }
+          return item;
+        });
+        save(KEYS.items, updatedItems);
+      }
     },
     [],
   );
@@ -5883,6 +5982,7 @@ export function useStore() {
     updateItemUnit,
     deleteItemUnit,
     addStockMovement,
+    postJournalEntry: postAutoJournal,
     stockMovements: state.stockMovements,
     accountMapping: load<AccountMapping>("bizpos_account_mapping", {
       cashAccountId: "acc-100-02-01-0002",

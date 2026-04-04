@@ -35,7 +35,7 @@ function saveAll(data: OpeningBalance[]) {
 }
 
 export default function OpeningBalancesPage() {
-  const { accounts, customers, suppliers } = useStore();
+  const { accounts, customers, suppliers, updateAccount } = useStore();
   const [data, setData] = useState<OpeningBalance[]>(load);
 
   const leafAccounts = accounts.filter((a) => !a.isGroup);
@@ -85,36 +85,12 @@ export default function OpeningBalancesPage() {
   const handleSaveAll = () => {
     const toSave = data.filter((d) => d.amount !== 0);
     saveAll(toSave);
-    // Update COA account balances for account-type entries
-    try {
-      const coaAccounts = JSON.parse(
-        localStorage.getItem("bizpos_accounts_v3") || "[]",
-      );
-      const updatedAccounts = coaAccounts.map(
-        (acc: {
-          id: string;
-          openingBalance: number;
-          currentBalance: number;
-        }) => {
-          const ob = toSave.find(
-            (d) => d.entityId === acc.id && d.entityType === "account",
-          );
-          if (ob) {
-            return {
-              ...acc,
-              openingBalance: ob.amount,
-              currentBalance: ob.amount,
-            };
-          }
-          return acc;
-        },
-      );
-      localStorage.setItem(
-        "bizpos_accounts_v3",
-        JSON.stringify(updatedAccounts),
-      );
-    } catch {
-      /* ignore */
+    // Update COA account balances via the store so the store event is dispatched
+    for (const ob of toSave.filter((d) => d.entityType === "account")) {
+      updateAccount(ob.entityId, {
+        openingBalance: ob.amount,
+        currentBalance: ob.amount,
+      });
     }
     toast.success("Opening balances saved");
   };

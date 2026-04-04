@@ -34,7 +34,7 @@ function loadDebitNotes(): DebitNote[] {
 }
 
 export default function PurchaseReturnsPage() {
-  const { suppliers } = useStore();
+  const { suppliers, settings } = useStore();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [notes] = useState<DebitNote[]>(loadDebitNotes);
@@ -82,7 +82,7 @@ export default function PurchaseReturnsPage() {
       rows,
       "purchase-returns.pdf",
       {
-        companyName: "BizPOS",
+        companyName: settings?.companyName || "BizPOS",
         reportTitle: "Purchase Returns",
         generatedBy: currentUser?.name,
       },
@@ -113,7 +113,7 @@ export default function PurchaseReturnsPage() {
       ],
       rows,
       {
-        companyName: "BizPOS",
+        companyName: settings?.companyName || "BizPOS",
         reportTitle: "Purchase Returns",
         generatedBy: currentUser?.name,
       },
