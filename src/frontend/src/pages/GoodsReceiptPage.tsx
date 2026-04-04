@@ -586,7 +586,7 @@ export default function GoodsReceiptPage() {
       {/* Add/Edit Modal */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent
-          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto"
           data-ocid="grn.dialog"
         >
           <DialogHeader>
@@ -858,7 +858,10 @@ export default function GoodsReceiptPage() {
 
       {/* View Modal */}
       <Dialog open={!!viewGRN} onOpenChange={() => setViewGRN(null)}>
-        <DialogContent className="max-w-2xl" data-ocid="grn.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl"
+          data-ocid="grn.modal"
+        >
           <DialogHeader>
             <DialogTitle>{viewGRN?.grnNo} — GRN Details</DialogTitle>
           </DialogHeader>

@@ -294,6 +294,7 @@ export interface Log {
   id: string;
   timestamp: string;
   user: string;
+  userId?: string;
   module: string;
   action: "create" | "update" | "delete" | "login" | "logout" | "view";
   details: string;
@@ -576,6 +577,17 @@ function getSessionUser(): string {
     return parsed?.name ?? "System";
   } catch {
     return "System";
+  }
+}
+
+function getSessionUserId(): string {
+  try {
+    const raw = localStorage.getItem("bizpos_session");
+    if (!raw) return "";
+    const parsed = JSON.parse(raw);
+    return parsed?.id ?? "";
+  } catch {
+    return "";
   }
 }
 
@@ -2750,7 +2762,7 @@ const KEYS = {
   leaveTypes: "bizpos_leave_types",
   leaveRequests: "bizpos_leave_requests",
   logs: "bizpos_logs",
-  seeded: "bizpos_seeded_v8",
+  seeded: "bizpos_seeded_v11",
   bankTransactions: "bizpos_bank_transactions",
   purchaseOrders: "bizpos_purchase_orders",
   taxes: "bizpos_taxes",
@@ -3812,10 +3824,12 @@ export function useStore() {
   const _log = useCallback(
     (module: string, action: Log["action"], details: string) => {
       const user = getSessionUser();
+      const userId = getSessionUserId();
       const entry: Log = {
         id: generateId(),
         timestamp: new Date().toISOString(),
         user,
+        userId,
         module,
         action,
         details,

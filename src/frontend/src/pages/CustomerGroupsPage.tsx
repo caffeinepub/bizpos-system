@@ -271,7 +271,10 @@ export default function CustomerGroupsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="customer_groups.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto"
+          data-ocid="customer_groups.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingGroup ? "Edit Customer Group" : "New Customer Group"}

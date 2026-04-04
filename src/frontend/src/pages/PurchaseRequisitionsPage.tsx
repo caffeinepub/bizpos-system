@@ -455,7 +455,7 @@ export default function PurchaseRequisitionsPage() {
       {/* Add/Edit Modal */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="req.dialog"
         >
           <DialogHeader>
@@ -636,7 +636,10 @@ export default function PurchaseRequisitionsPage() {
 
       {/* View Modal */}
       <Dialog open={!!viewReq} onOpenChange={() => setViewReq(null)}>
-        <DialogContent className="max-w-2xl" data-ocid="req.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl"
+          data-ocid="req.modal"
+        >
           <DialogHeader>
             <DialogTitle>Requisition: {viewReq?.requisitionNo}</DialogTitle>
           </DialogHeader>

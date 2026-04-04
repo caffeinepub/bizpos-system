@@ -365,7 +365,7 @@ export default function BankBranchesPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Branch" : "Add Branch"}</DialogTitle>
           </DialogHeader>
@@ -474,7 +474,7 @@ export default function BankBranchesPage() {
       </Dialog>
 
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Branch</DialogTitle>
           </DialogHeader>

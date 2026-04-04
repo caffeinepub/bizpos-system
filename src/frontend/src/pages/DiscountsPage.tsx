@@ -360,7 +360,10 @@ export default function DiscountsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="discounts.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          data-ocid="discounts.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit Discount" : "Add Discount"}

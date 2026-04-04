@@ -370,7 +370,10 @@ export default function CompaniesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="companies.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="companies.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingCompany ? "Edit Company" : "Add New Company"}

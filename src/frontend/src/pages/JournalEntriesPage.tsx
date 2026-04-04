@@ -167,7 +167,7 @@ export default function JournalEntriesPage() {
     // Update COA account balances
     try {
       const coaAccounts = JSON.parse(
-        localStorage.getItem("bizpos_accounts") || "[]",
+        localStorage.getItem("bizpos_accounts_v3") || "[]",
       );
       const updatedAccounts = coaAccounts.map(
         (acc: { id: string; type: string; currentBalance: number }) => {
@@ -193,7 +193,10 @@ export default function JournalEntriesPage() {
           return acc;
         },
       );
-      localStorage.setItem("bizpos_accounts", JSON.stringify(updatedAccounts));
+      localStorage.setItem(
+        "bizpos_accounts_v3",
+        JSON.stringify(updatedAccounts),
+      );
     } catch {
       /* ignore */
     }
@@ -301,7 +304,7 @@ export default function JournalEntriesPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto"
           data-ocid="journal.dialog"
         >
           <DialogHeader>
@@ -465,7 +468,10 @@ export default function JournalEntriesPage() {
       </Dialog>
 
       <Dialog open={!!viewEntry} onOpenChange={() => setViewEntry(null)}>
-        <DialogContent className="max-w-2xl" data-ocid="journal.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl"
+          data-ocid="journal.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Journal Entry — {viewEntry?.reference}</DialogTitle>
           </DialogHeader>

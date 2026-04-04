@@ -423,7 +423,10 @@ export default function PromotionsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="promotions.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="promotions.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit Promotion" : "Add Promotion"}

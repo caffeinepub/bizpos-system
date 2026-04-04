@@ -25,12 +25,14 @@ function writeLog(
   action: string,
   details: string,
   userName: string,
+  userId?: string,
 ) {
   try {
     const entry = {
       id: Math.random().toString(36).slice(2),
       timestamp: new Date().toISOString(),
       user: userName,
+      userId: userId ?? "",
       module,
       action,
       details,
@@ -69,15 +71,16 @@ export default function LoginPage() {
     const ok = login(email.trim(), password);
     setLoading(false);
     if (ok) {
-      writeLog(
-        "Auth",
-        "login",
-        `User logged in: ${email.trim()}`,
-        email.trim(),
-      );
       try {
         const session = JSON.parse(
           localStorage.getItem("bizpos_session") || "{}",
+        );
+        writeLog(
+          "Auth",
+          "login",
+          `User logged in: ${session.name ?? email.trim()}`,
+          session.name ?? email.trim(),
+          session.id ?? "",
         );
         if (session.isSuperUser) {
           navigate({ to: "/company-select" });
@@ -85,6 +88,12 @@ export default function LoginPage() {
           navigate({ to: "/dashboard" });
         }
       } catch {
+        writeLog(
+          "Auth",
+          "login",
+          `User logged in: ${email.trim()}`,
+          email.trim(),
+        );
         navigate({ to: "/dashboard" });
       }
     } else {
@@ -236,7 +245,10 @@ export default function LoginPage() {
 
       {/* Forgot Password Dialog */}
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
-        <DialogContent className="max-w-sm" data-ocid="login.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-sm"
+          data-ocid="login.dialog"
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-blue-600" />

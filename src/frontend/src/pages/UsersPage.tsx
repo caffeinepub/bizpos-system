@@ -388,7 +388,10 @@ export default function UsersPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="users.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="users.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingUser ? "Edit User" : "Add New User"}

@@ -88,7 +88,7 @@ export default function OpeningBalancesPage() {
     // Update COA account balances for account-type entries
     try {
       const coaAccounts = JSON.parse(
-        localStorage.getItem("bizpos_accounts") || "[]",
+        localStorage.getItem("bizpos_accounts_v3") || "[]",
       );
       const updatedAccounts = coaAccounts.map(
         (acc: {
@@ -109,7 +109,10 @@ export default function OpeningBalancesPage() {
           return acc;
         },
       );
-      localStorage.setItem("bizpos_accounts", JSON.stringify(updatedAccounts));
+      localStorage.setItem(
+        "bizpos_accounts_v3",
+        JSON.stringify(updatedAccounts),
+      );
     } catch {
       /* ignore */
     }

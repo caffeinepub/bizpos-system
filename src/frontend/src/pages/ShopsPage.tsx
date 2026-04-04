@@ -355,7 +355,10 @@ export default function ShopsPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="shops.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="shops.dialog"
+        >
           <DialogHeader>
             <DialogTitle>{editingShop ? "Edit Shop" : "Add Shop"}</DialogTitle>
           </DialogHeader>

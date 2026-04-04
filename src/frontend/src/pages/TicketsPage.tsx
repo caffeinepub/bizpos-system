@@ -644,7 +644,10 @@ export default function TicketsPage() {
 
       {/* New Ticket Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="tickets.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="tickets.dialog"
+        >
           <DialogHeader>
             <DialogTitle>New Ticket</DialogTitle>
           </DialogHeader>

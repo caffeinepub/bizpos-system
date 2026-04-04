@@ -295,7 +295,10 @@ export default function FinancialYearsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="financial_years.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          data-ocid="financial_years.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingYear ? "Edit Financial Year" : "New Financial Year"}

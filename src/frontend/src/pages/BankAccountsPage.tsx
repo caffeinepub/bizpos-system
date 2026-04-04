@@ -102,7 +102,7 @@ const SEED_ACCOUNTS: BankAccount[] = [
 const LS_KEY = "bizpos_bank_accounts";
 const LS_BANKS = "bizpos_banks";
 const LS_BRANCHES = "bizpos_bank_branches";
-const LS_COA = "bizpos_accounts_v4";
+const LS_COA = "bizpos_accounts_v3";
 const _SEED_KEY = "bizpos_seeded_bank_v1";
 
 function loadBA(): BankAccount[] {
@@ -476,7 +476,7 @@ export default function BankAccountsPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit Bank Account" : "Add Bank Account"}
@@ -649,7 +649,7 @@ export default function BankAccountsPage() {
       </Dialog>
 
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Account</DialogTitle>
           </DialogHeader>

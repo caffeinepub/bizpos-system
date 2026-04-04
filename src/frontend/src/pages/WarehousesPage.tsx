@@ -365,7 +365,10 @@ export default function WarehousesPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="warehouses.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="warehouses.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingWarehouse ? "Edit Warehouse" : "Add Warehouse"}

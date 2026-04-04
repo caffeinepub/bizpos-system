@@ -1,60 +1,79 @@
 # BizPOS System
 
 ## Current State
-- Preferences (compact tables, tooltips, notifications, date format, currency) are saved to `bizpos_user_prefs` in localStorage but **not applied** anywhere in the app. They are purely cosmetic.
-- The Edit Profile modal shows initials-based avatar with no option to upload a photo.
-- POS page has currency amounts hardcoded as plain numbers with `.toLocaleString()` — no currency symbol prepended.
-- ReportsPage hardcodes `PKR` as the currency prefix in all KPI cards and table cells.
-- `NotificationBell` in AppLayout always shows all notifications regardless of user preferences.
-- No shared `formatDate` or `formatCurrency` utility exists — each page formats independently.
+A comprehensive frontend-only POS + ERP system with 60+ screens covering:
+- Company → Warehouse → Shop hierarchy
+- POS, Sales, Purchases, Inventory, Payments
+- Accounting (COA, Journal Entries, Trial Balance, Balance Sheet, P&L)
+- HR & Payroll (Employees, Salary, Attendance, Shifts, Departments, Designations)
+- Supply Chain (Requisitions, GRN, Transfers, Shipments, Supplier Performance)
+- Banking (Banks, Branches, Accounts, Cheque Books, Cheque Templates, Cheque Print, Bank Reconciliation)
+- CRM (Customers, Suppliers, Customer Groups)
+- Pricing (Taxes, Discounts, Promotions)
+- Reports Center (Financial, Sales, Purchase, Inventory, HR, Warehouse, Banking, Tax, Aging, Operations)
+- Admin (Users, Roles, Tickets, Logs, Settings)
+- Various ancillary pages (Credit/Debit Notes, Returns, Opening Balances, Financial Years, Expense Categories)
+
+Recent fixes applied:
+- Sidebar menu highlighting bug (Purchases highlighting Supply Chain, Admin highlighting Warehouse) fixed
+- All modals made responsive width (no horizontal scrolling)
+- Preferences wired up (compact tables, tooltips, notifications, currency, date format)
+- My Activity logs wired to real user actions
+- Banking/Pricing/Supply Chain sidebar permission key mismatches fixed
+- Route guards and auth flow tightened
+- Stock flow end-to-end fixed
 
 ## Requested Changes (Diff)
 
 ### Add
-- `src/frontend/src/lib/prefs.ts` — shared utility module with:
-  - `getPrefs()` — reads `bizpos_user_prefs` from localStorage, returns defaults if not set
-  - `formatCurrency(amount, currency?)` — returns formatted string with correct symbol (PKR, USD, EUR, GBP, AED, SAR)
-  - `formatDate(date, dateFormat?)` — formats a Date or ISO string per the user's date format preference (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
-- Profile photo upload to Edit Profile modal: file input (accept image/*), preview the selected image as a circular avatar, store base64 in `bizpos_user_photo_{userId}` in localStorage, display the photo everywhere the initials avatar is shown (profile dropdown avatar, Edit Profile modal header)
+- Nothing new — this is a full audit and fix pass
 
 ### Modify
-- **`AppLayout.tsx` — PreferencesContext/propagation:**
-  - After `savePrefs()`, dispatch a custom DOM event `bizpos:prefs-changed` so other components can reactively re-read preferences without a full page reload.
-  - `ProfileDropdown` component: show photo if available, else initials. Add photo upload UI in the Edit Profile modal.
-  - `NotificationBell`: read prefs from localStorage and filter notifications based on `notifLowStock`, `notifPendingApprovals`, `notifSales` flags.
-  - When `savePrefs` is called, apply `compact` class to `document.body` (or a data attribute `data-compact="true"`) so CSS can target table rows globally — avoids needing to touch every page.
-
-- **Global CSS (`index.css`):**
-  - Add rule: `body[data-compact='true'] table tbody tr td, body[data-compact='true'] table tbody tr th { padding-top: 0.25rem; padding-bottom: 0.25rem; font-size: 0.75rem; }` to implement compact table mode globally without touching each page.
-  - Add rule for tooltips: `body[data-tooltips='false'] [data-tooltip], body[data-tooltips='false'] [title] { pointer-events: auto; }` — and hide tooltip content elements with class `tooltip-hint` when tooltips are off.
-
-- **`AppLayout.tsx` — apply data attributes on mount and on pref change:**
-  - On mount, read prefs and set `document.body.dataset.compact` and `document.body.dataset.tooltips` from stored prefs.
-  - After `savePrefs()`, update these data attributes immediately so compact/tooltip changes are instant.
-
-- **`POSPage.tsx`:**
-  - Import `formatCurrency` and `getPrefs` from `@/lib/prefs`.
-  - Replace all `.toLocaleString()` and `.toFixed(2)` currency displays with `formatCurrency(value, prefs.currency)`.
-  - This covers: item price column, subtotal, discount, promo savings, tax, total in cart, and the receipt modal.
-
-- **`ReportsPage.tsx`:**
-  - Import `formatCurrency` and `getPrefs` from `@/lib/prefs`.
-  - Replace hardcoded `PKR ${fmt(...)}` strings with `formatCurrency(value, prefs.currency)`.
-  - Replace hardcoded `fmt()` in KPI cards across Sales, Purchase, Inventory, Payroll report tabs.
-  - The `fmt` helper at top of file should be replaced/supplemented by the shared utility.
+- Fix ALL remaining UI inconsistencies, broken flows, weird behaviors, and edge cases across every screen
+- Ensure every module is correctly linked to the Company → Warehouse → Shop hierarchy
+- Ensure sidebar navigation has no duplicate active states anywhere
+- Ensure all CRUD operations work (create, edit, delete, view) on every page
+- Ensure all modals open correctly with proper sizing and no horizontal scroll
+- Ensure all forms have proper validation and don't crash on empty/invalid input
+- Ensure all export functions (PDF/Excel) work without errors
+- Ensure all table filters work correctly
+- Ensure all tabs on multi-tab pages switch correctly
+- Ensure all links between related modules work (e.g., clicking warehouse on shops page links back)
+- Ensure keyboard shortcuts all work as documented
+- Ensure bookmark and favorites features work
+- Ensure profile dropdown (Edit Profile, Change Password, Preferences, My Activity) all work
+- Ensure seed data loads correctly with proper key `bizpos_seeded_v11` (bump version to fix stale data issues)
+- Fix any TypeScript errors that may cause runtime crashes
+- Fix any broken imports or missing page references in App.tsx routing
+- Ensure RBAC permission checks on every route are consistent
+- Fix any issues with the super user company-select flow (no sidebar/header until company selected)
+- Ensure POS checkout works correctly end-to-end
+- Ensure Bank Reconciliation 4-tab structure works
+- Ensure Cheque Templates form works without crashing
+- Ensure Cheque Print PDF generation works
+- Ensure Reports Center all reports render without error
+- Fix any issues with the COA FancyTree (right-click context menus, tree collapse/expand)
+- Ensure Supply Chain approval workflow functions correctly
+- Ensure Salary Processing generates slips correctly
+- Ensure Shift Closing reads from real sales data
+- Ensure Attendance module marks and displays attendance correctly
+- Ensure Tickets module workflow (Open→Assigned→In Progress→Resolved→Closed) works
+- Ensure Attachments work throughout the system
+- Ensure notification bell shows correct alerts based on preferences
+- Ensure currency preference updates all monetary displays
+- Ensure date format preference is applied globally
+- Ensure compact table preference applies to all tables
+- Fix any broken routes in App.tsx (all 60+ pages must be routed)
+- Check for any missing pages that are referenced in sidebar but not in App.tsx
 
 ### Remove
-- Nothing removed, only additions and targeted edits.
+- Nothing to remove
 
 ## Implementation Plan
 
-1. Create `src/frontend/src/lib/prefs.ts` with `getPrefs()`, `formatCurrency()`, `formatDate()` exports.
-2. Update `index.css` to add global compact-table and tooltip CSS rules using data attributes.
-3. Update `AppLayout.tsx`:
-   a. On mount, apply data attributes to body from saved prefs.
-   b. After `savePrefs()`, update body data attributes immediately and dispatch `bizpos:prefs-changed` event.
-   c. In `NotificationBell`, filter notifications by pref flags.
-   d. In Edit Profile modal, replace initials avatar with photo upload: file input, base64 preview, save to `bizpos_user_photo_{id}`, display photo if available.
-   e. In profile dropdown avatar circle, show photo img if available.
-4. Update `POSPage.tsx`: use `formatCurrency` for all monetary displays; re-read prefs on component mount (listen to `bizpos:prefs-changed` event to re-render).
-5. Update `ReportsPage.tsx`: use `formatCurrency` for all PKR-prefixed monetary KPI cards and table values; listen to `bizpos:prefs-changed` for reactivity.
+1. **Read and audit** App.tsx (routes), AppLayout.tsx (sidebar/nav), AuthContext.tsx (auth/session)
+2. **Cross-check** all sidebar links against App.tsx routes — find any missing routes
+3. **Check each page file** for obvious crashes, missing imports, broken logic
+4. **Fix all identified issues** in a comprehensive batch
+5. **Bump seed version** to `bizpos_seeded_v11` to ensure fresh data loads
+6. **Validate** (lint + typecheck + build)

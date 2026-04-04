@@ -448,7 +448,7 @@ export default function PurchasesPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] xl:max-w-4xl max-h-[90vh] overflow-y-auto"
           data-ocid="purchases.dialog"
         >
           <DialogHeader>
@@ -663,7 +663,10 @@ export default function PurchasesPage() {
       </Dialog>
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-2xl" data-ocid="purchases.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl"
+          data-ocid="purchases.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Purchase Details — {viewPurchase?.id}</DialogTitle>
           </DialogHeader>

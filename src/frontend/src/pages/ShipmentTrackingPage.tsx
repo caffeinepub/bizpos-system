@@ -459,7 +459,7 @@ export default function ShipmentTrackingPage() {
       {/* Add/Edit Modal */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="shipment.dialog"
         >
           <DialogHeader>
@@ -677,7 +677,10 @@ export default function ShipmentTrackingPage() {
 
       {/* View Modal */}
       <Dialog open={!!viewShipment} onOpenChange={() => setViewShipment(null)}>
-        <DialogContent className="max-w-xl" data-ocid="shipment.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="shipment.modal"
+        >
           <DialogHeader>
             <DialogTitle>
               {viewShipment?.shipmentNo} — Shipment Details
@@ -781,7 +784,10 @@ export default function ShipmentTrackingPage() {
         open={!!statusUpdateShipment}
         onOpenChange={() => setStatusUpdateShipment(null)}
       >
-        <DialogContent className="max-w-sm" data-ocid="shipment.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-sm"
+          data-ocid="shipment.modal"
+        >
           <DialogHeader>
             <DialogTitle>
               Update Status — {statusUpdateShipment?.shipmentNo}

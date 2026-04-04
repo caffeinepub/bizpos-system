@@ -560,7 +560,7 @@ export default function PurchaseOrdersPage() {
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="po.dialog"
         >
           <DialogHeader>

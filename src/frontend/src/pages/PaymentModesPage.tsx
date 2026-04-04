@@ -136,7 +136,10 @@ export default function PaymentModesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="payment_modes.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto"
+          data-ocid="payment_modes.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingMode ? "Edit Payment Mode" : "Add Payment Mode"}

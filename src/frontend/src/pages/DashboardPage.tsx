@@ -18,7 +18,7 @@ import {
   ShoppingCart,
   TrendingUp,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -30,6 +30,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency, getPrefs } from "../lib/prefs";
 import { useStore } from "../store/useStore";
 
 export default function DashboardPage() {
@@ -44,6 +45,13 @@ export default function DashboardPage() {
   } = useStore();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+
+  const [prefs, setPrefs] = useState(getPrefs);
+  useEffect(() => {
+    const handler = () => setPrefs(getPrefs());
+    window.addEventListener("bizpos:prefs-changed", handler);
+    return () => window.removeEventListener("bizpos:prefs-changed", handler);
+  }, []);
 
   const companyWarehouseIds = useMemo(() => {
     if (!currentUser?.activeCompanyId) return null;
@@ -121,7 +129,7 @@ export default function DashboardPage() {
   const kpiCards = [
     {
       title: "Today's Sales",
-      value: totalSalesToday.toLocaleString(),
+      value: formatCurrency(totalSalesToday, prefs.currency),
       sub: `${todaySales.length} transactions`,
       icon: ShoppingCart,
       color: "text-blue-600",
@@ -130,7 +138,7 @@ export default function DashboardPage() {
     },
     {
       title: "Today's Purchases",
-      value: totalPurchasesToday.toLocaleString(),
+      value: formatCurrency(totalPurchasesToday, prefs.currency),
       sub: `${todayPurchases.length} orders`,
       icon: ShoppingBag,
       color: "text-orange-500",
@@ -139,7 +147,7 @@ export default function DashboardPage() {
     },
     {
       title: "Cash Balance",
-      value: cashBalance.toLocaleString(),
+      value: formatCurrency(cashBalance, prefs.currency),
       sub: "Total collected",
       icon: DollarSign,
       color: "text-green-600",
@@ -304,7 +312,7 @@ export default function DashboardPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {sale.total.toLocaleString()}
+                        {formatCurrency(sale.total, prefs.currency)}
                       </TableCell>
                     </TableRow>
                   ))

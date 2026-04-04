@@ -244,7 +244,7 @@ export default function ChequeTemplatesPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-[92vw] xl:max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-gray-800">
               {form.id ? "Edit Cheque Template" : "Add Cheque Template"}
@@ -468,7 +468,7 @@ export default function ChequeTemplatesPage() {
 
       {/* Delete confirm dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Template</DialogTitle>
           </DialogHeader>

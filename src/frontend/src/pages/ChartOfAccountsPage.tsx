@@ -1265,7 +1265,7 @@ export default function ChartOfAccountsPage() {
 
       {/* ── Add/Edit Dialog ──────────────────────────────────────────────── */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {formMode === "add" ? "Add Account" : "Edit Account"}
@@ -1294,7 +1294,7 @@ export default function ChartOfAccountsPage() {
 
       {/* ── View Dialog ──────────────────────────────────────────────────── */}
       <Dialog open={!!viewAcc} onOpenChange={() => setViewAcc(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Account Details</DialogTitle>
           </DialogHeader>
@@ -1351,7 +1351,7 @@ export default function ChartOfAccountsPage() {
 
       {/* ── Import Preview Dialog ────────────────────────────────────────── */}
       <Dialog open={importPreview} onOpenChange={setImportPreview}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               Import Preview — {importRows.length} rows found

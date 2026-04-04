@@ -525,7 +525,10 @@ export default function ItemsPage() {
 
       {/* Item Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="items.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="items.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingItem ? "Edit Item" : "Add New Item"}
@@ -663,7 +666,10 @@ export default function ItemsPage() {
 
       {/* Barcode Dialog */}
       <Dialog open={!!barcodeItem} onOpenChange={() => setBarcodeItem(null)}>
-        <DialogContent className="max-w-sm" data-ocid="items.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-sm"
+          data-ocid="items.dialog"
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Barcode className="h-5 w-5" />

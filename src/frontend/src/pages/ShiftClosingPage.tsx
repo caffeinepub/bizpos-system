@@ -603,7 +603,10 @@ export default function ShiftClosingPage() {
 
       {/* Close Shift Dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <DialogContent data-ocid="shift_closing.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="shift_closing.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Close Shift</DialogTitle>
           </DialogHeader>
@@ -696,7 +699,10 @@ export default function ShiftClosingPage() {
 
       {/* View Report Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-lg" data-ocid="shift_closing.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="shift_closing.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Shift Closing Report</DialogTitle>
           </DialogHeader>

@@ -35,7 +35,7 @@ export default function ProfileSetupModal() {
   return (
     <Dialog open={true}>
       <DialogContent
-        className="sm:max-w-md"
+        className="w-full max-w-[95vw] sm:max-w-md"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>

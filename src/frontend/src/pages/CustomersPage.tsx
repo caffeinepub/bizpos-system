@@ -483,7 +483,10 @@ export default function CustomersPage() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="customers.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="customers.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingCustomer ? "Edit Customer" : "Add Customer"}

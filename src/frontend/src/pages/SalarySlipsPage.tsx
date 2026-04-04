@@ -699,7 +699,10 @@ export default function SalarySlipsPage() {
 
       {/* Generate Slip Dialog */}
       <Dialog open={genOpen} onOpenChange={setGenOpen}>
-        <DialogContent data-ocid="salary_slips.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="salary_slips.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Generate Salary Slip</DialogTitle>
           </DialogHeader>

@@ -204,7 +204,10 @@ export default function ExpensesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="expenses.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto"
+          data-ocid="expenses.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingExpense ? "Edit Expense" : "Add Expense"}

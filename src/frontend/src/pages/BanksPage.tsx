@@ -317,7 +317,7 @@ export default function BanksPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Bank" : "Add Bank"}</DialogTitle>
           </DialogHeader>
@@ -391,7 +391,7 @@ export default function BanksPage() {
       </Dialog>
 
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent>
+        <DialogContent className="w-full max-w-[95vw] sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Bank</DialogTitle>
           </DialogHeader>

@@ -449,7 +449,10 @@ export default function SuppliersPage() {
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="suppliers.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="suppliers.dialog"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingSupplier ? "Edit Supplier" : "Add Supplier"}

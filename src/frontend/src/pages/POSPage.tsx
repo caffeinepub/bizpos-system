@@ -387,7 +387,10 @@ export default function POSPage() {
     <div className="p-6 space-y-4">
       {/* Shop selector dialog */}
       <Dialog open={shopDialogOpen} onOpenChange={setShopDialogOpen}>
-        <DialogContent data-ocid="pos.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto"
+          data-ocid="pos.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Select Shop</DialogTitle>
           </DialogHeader>
@@ -412,7 +415,10 @@ export default function POSPage() {
 
       {/* Receipt Modal */}
       <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
-        <DialogContent className="max-w-lg print:block" data-ocid="pos.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-lg print:block"
+          data-ocid="pos.modal"
+        >
           <DialogHeader>
             <DialogTitle>Sale Completed — Receipt</DialogTitle>
           </DialogHeader>

@@ -476,7 +476,7 @@ export default function InventoryTransfersPage() {
       {/* Add/Edit Modal */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="transfer.dialog"
         >
           <DialogHeader>
@@ -667,7 +667,10 @@ export default function InventoryTransfersPage() {
 
       {/* View Modal */}
       <Dialog open={!!viewTransfer} onOpenChange={() => setViewTransfer(null)}>
-        <DialogContent className="max-w-xl" data-ocid="transfer.modal">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-xl"
+          data-ocid="transfer.modal"
+        >
           <DialogHeader>
             <DialogTitle>
               {viewTransfer?.transferNo} — Transfer Details

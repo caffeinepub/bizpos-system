@@ -172,7 +172,6 @@ const navGroups: NavGroup[] = [
     icon: Building2,
     module: "warehouse",
     subItems: [
-      { path: "/companies", label: "Companies", icon: Building2 },
       { path: "/warehouses", label: "Warehouses", icon: Warehouse },
       { path: "/shops", label: "Shops", icon: Store },
     ],
@@ -244,7 +243,6 @@ const navGroups: NavGroup[] = [
         label: "Purchase Requisitions",
         icon: ClipboardList,
       },
-      { path: "/purchase-orders", label: "Purchase Orders", icon: FileText },
       { path: "/goods-receipt", label: "Goods Receipt", icon: Package },
       {
         path: "/inventory-transfers",
@@ -1207,7 +1205,14 @@ function UserProfileDropdown({
   const activityLogs = (() => {
     try {
       const logs = JSON.parse(localStorage.getItem("bizpos_logs") || "[]");
-      return logs.filter((l: any) => l.userId === currentUser?.id).slice(0, 20);
+      return logs
+        .filter(
+          (l: any) =>
+            // Match by userId (new logs) OR by user name (legacy logs)
+            (l.userId && l.userId === currentUser?.id) ||
+            (!l.userId && l.user === currentUser?.name),
+        )
+        .slice(0, 20);
     } catch {
       return [];
     }

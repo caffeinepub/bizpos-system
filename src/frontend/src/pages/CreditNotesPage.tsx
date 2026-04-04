@@ -472,7 +472,7 @@ export default function CreditNotesPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="max-w-3xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-[90vw] lg:max-w-3xl max-h-[90vh] overflow-y-auto"
           data-ocid="credit_notes.dialog"
         >
           <DialogHeader>

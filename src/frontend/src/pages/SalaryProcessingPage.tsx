@@ -842,7 +842,10 @@ export default function SalaryProcessingPage() {
 
       {/* Payslip Dialog */}
       <Dialog open={payslipDialogOpen} onOpenChange={setPayslipDialogOpen}>
-        <DialogContent className="max-w-md" data-ocid="salary.dialog">
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-lg"
+          data-ocid="salary.dialog"
+        >
           <DialogHeader>
             <DialogTitle>Payslip — {payslipPeriod}</DialogTitle>
           </DialogHeader>

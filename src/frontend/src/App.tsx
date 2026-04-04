@@ -512,6 +512,112 @@ import WarehousesPage from "./pages/WarehousesPage";
   localStorage.setItem("bizpos_seeded_v10", "1");
 })();
 
+// V11 seed: ensure all sessions have correct permissions refresh
+(function ensureSeedV11() {
+  if (localStorage.getItem("bizpos_seeded_v11")) return;
+
+  // Ensure all roles have correct permissions
+  const ALL_PERMS = [
+    "dashboard",
+    "reports",
+    "logs",
+    "settings",
+    "pos",
+    "sales",
+    "sales_returns",
+    "credit_notes",
+    "payments",
+    "customers",
+    "customer_groups",
+    "purchases",
+    "purchase_orders",
+    "purchase_returns",
+    "debit_notes",
+    "suppliers",
+    "taxes",
+    "discounts",
+    "promotions",
+    "inventory",
+    "stock_adjustment",
+    "warehouse_stock",
+    "companies",
+    "warehouse",
+    "shops",
+    "accounts",
+    "journal_entries",
+    "opening_balances",
+    "financial_years",
+    "expenses",
+    "expense_categories",
+    "bank_reconciliation",
+    "trial_balance",
+    "balance_sheet",
+    "profit_loss",
+    "employees",
+    "salary_processing",
+    "leave_management",
+    "departments",
+    "designations",
+    "allowance_types",
+    "salary_slips",
+    "shifts",
+    "shift_closing",
+    "attendance",
+    "supply_chain",
+    "purchase_requisitions",
+    "goods_receipt",
+    "inventory_transfers",
+    "shipments",
+    "supplier_performance",
+    "banking",
+    "banks",
+    "bank_branches",
+    "bank_accounts",
+    "cheque_books",
+    "cheque_templates",
+    "cheque_print",
+    "tickets",
+    "users",
+    "roles",
+  ];
+
+  try {
+    const roles = JSON.parse(localStorage.getItem("bizpos_roles") || "[]");
+    const updatedRoles = roles.map(
+      (r: { name: string; permissions: string[] }) => {
+        if (r.name === "Admin") return { ...r, permissions: ALL_PERMS };
+        if (r.name === "Cashier")
+          return {
+            ...r,
+            permissions: ["dashboard", "pos", "sales", "payments"],
+          };
+        return r;
+      },
+    );
+    localStorage.setItem("bizpos_roles", JSON.stringify(updatedRoles));
+  } catch {
+    /* ignore */
+  }
+
+  // Fix session permissions if admin
+  try {
+    const session = JSON.parse(
+      localStorage.getItem("bizpos_session") || "null",
+    );
+    if (
+      session &&
+      (session.permissions?.includes("all") || session.roleName === "Admin")
+    ) {
+      const updated = { ...session, permissions: ALL_PERMS };
+      localStorage.setItem("bizpos_session", JSON.stringify(updated));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  localStorage.setItem("bizpos_seeded_v11", "1");
+})();
+
 // Fix: ensure "banking" permission is in all admin sessions
 (() => {
   try {
