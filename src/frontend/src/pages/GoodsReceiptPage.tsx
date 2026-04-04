@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import AttachmentManager from "../components/AttachmentManager";
 import {
   type GRNItem,
   type GoodsReceiptNote,
@@ -71,6 +72,7 @@ const EMPTY_FORM: FormData = {
 
 export default function GoodsReceiptPage() {
   const store = useStore();
+  const { addStockMovement } = store;
   const grns = store.goodsReceiptNotes;
   const purchaseOrders = store.purchaseOrders;
   const warehouses = store.warehouses;
@@ -500,6 +502,22 @@ export default function GoodsReceiptPage() {
                                 store.updateGoodsReceiptNote(g.id, {
                                   status: "Accepted",
                                 });
+                                // Record stock movements for each accepted item
+                                for (const grnItem of g.items) {
+                                  if (grnItem.acceptedQty > 0) {
+                                    addStockMovement({
+                                      itemId: grnItem.productId || "",
+                                      itemName: grnItem.productName,
+                                      type: "GRN",
+                                      reference: g.grnNo,
+                                      quantityChange: grnItem.acceptedQty,
+                                      quantityAfter: 0,
+                                      warehouseId: g.warehouseId,
+                                      warehouseName: g.warehouseName,
+                                      notes: `GRN acceptance: ${g.grnNo}`,
+                                    });
+                                  }
+                                }
                               })()
                             }
                           >
@@ -859,86 +877,101 @@ export default function GoodsReceiptPage() {
       {/* View Modal */}
       <Dialog open={!!viewGRN} onOpenChange={() => setViewGRN(null)}>
         <DialogContent
-          className="w-full max-w-[95vw] sm:max-w-2xl"
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="grn.modal"
         >
           <DialogHeader>
             <DialogTitle>{viewGRN?.grnNo} — GRN Details</DialogTitle>
           </DialogHeader>
           {viewGRN && (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-slate-500">PO No:</span>{" "}
-                  {viewGRN.poNumber}
+            <Tabs defaultValue="details">
+              <TabsList className="mb-4">
+                <TabsTrigger value="details" data-ocid="grn.tab">
+                  Details
+                </TabsTrigger>
+                <TabsTrigger value="attachments" data-ocid="grn.tab">
+                  Attachments
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="details">
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-slate-500">PO No:</span>{" "}
+                      {viewGRN.poNumber}
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Supplier:</span>{" "}
+                      {viewGRN.supplierName}
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Warehouse:</span>{" "}
+                      {viewGRN.warehouseName}
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Date:</span>{" "}
+                      {viewGRN.receivedDate}
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Status:</span>{" "}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[viewGRN.status] || ""}`}
+                      >
+                        {viewGRN.status}
+                      </span>
+                    </div>
+                  </div>
+                  <table className="w-full border rounded text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {[
+                          "Product",
+                          "Ordered",
+                          "Received",
+                          "Accepted",
+                          "Rejected",
+                        ].map((h) => (
+                          <th key={h} className="px-3 py-2 text-left">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewGRN.items.map((it, i) => (
+                        <tr
+                          key={
+                            it.productName
+                              ? `view-${it.productName}-${i}`
+                              : `view-row-${i}`
+                          }
+                          className="border-t"
+                        >
+                          <td className="px-3 py-2">{it.productName}</td>
+                          <td className="px-3 py-2">{it.orderedQty}</td>
+                          <td className="px-3 py-2">{it.receivedQty}</td>
+                          <td className="px-3 py-2 text-green-600">
+                            {it.acceptedQty}
+                          </td>
+                          <td className="px-3 py-2 text-red-600">
+                            {it.rejectedQty}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {viewGRN.qualityNotes && (
+                    <p>
+                      <span className="font-medium">Notes:</span>{" "}
+                      {viewGRN.qualityNotes}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <span className="text-slate-500">Supplier:</span>{" "}
-                  {viewGRN.supplierName}
-                </div>
-                <div>
-                  <span className="text-slate-500">Warehouse:</span>{" "}
-                  {viewGRN.warehouseName}
-                </div>
-                <div>
-                  <span className="text-slate-500">Date:</span>{" "}
-                  {viewGRN.receivedDate}
-                </div>
-                <div>
-                  <span className="text-slate-500">Status:</span>{" "}
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[viewGRN.status] || ""}`}
-                  >
-                    {viewGRN.status}
-                  </span>
-                </div>
-              </div>
-              <table className="w-full border rounded text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    {[
-                      "Product",
-                      "Ordered",
-                      "Received",
-                      "Accepted",
-                      "Rejected",
-                    ].map((h) => (
-                      <th key={h} className="px-3 py-2 text-left">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewGRN.items.map((it, i) => (
-                    <tr
-                      key={
-                        it.productName
-                          ? `view-${it.productName}-${i}`
-                          : `view-row-${i}`
-                      }
-                      className="border-t"
-                    >
-                      <td className="px-3 py-2">{it.productName}</td>
-                      <td className="px-3 py-2">{it.orderedQty}</td>
-                      <td className="px-3 py-2">{it.receivedQty}</td>
-                      <td className="px-3 py-2 text-green-600">
-                        {it.acceptedQty}
-                      </td>
-                      <td className="px-3 py-2 text-red-600">
-                        {it.rejectedQty}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {viewGRN.qualityNotes && (
-                <p>
-                  <span className="font-medium">Notes:</span>{" "}
-                  {viewGRN.qualityNotes}
-                </p>
-              )}
-            </div>
+              </TabsContent>
+              <TabsContent value="attachments">
+                <AttachmentManager moduleKey="grn" recordId={viewGRN.id} />
+              </TabsContent>
+            </Tabs>
           )}
           <DialogFooter>
             <Button

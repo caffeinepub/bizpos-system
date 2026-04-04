@@ -37,6 +37,9 @@ import ExpensesPage from "./pages/ExpensesPage";
 import FinancialYearsPage from "./pages/FinancialYearsPage";
 import GoodsReceiptPage from "./pages/GoodsReceiptPage";
 import InventoryTransfersPage from "./pages/InventoryTransfersPage";
+import ItemBrandsPage from "./pages/ItemBrandsPage";
+import ItemCategoriesPage from "./pages/ItemCategoriesPage";
+import ItemUnitsPage from "./pages/ItemUnitsPage";
 import ItemsPage from "./pages/ItemsPage";
 import JournalEntriesPage from "./pages/JournalEntriesPage";
 import LeaveManagementPage from "./pages/LeaveManagementPage";
@@ -417,6 +420,10 @@ import WarehousesPage from "./pages/WarehousesPage";
     "tickets",
     "users",
     "roles",
+    "item_categories",
+    "item_brands",
+    "item_units",
+    "attachments",
   ];
 
   // Update roles
@@ -579,6 +586,10 @@ import WarehousesPage from "./pages/WarehousesPage";
     "tickets",
     "users",
     "roles",
+    "item_categories",
+    "item_brands",
+    "item_units",
+    "attachments",
   ];
 
   try {
@@ -648,6 +659,346 @@ import WarehousesPage from "./pages/WarehousesPage";
   } catch {
     /* ignore */
   }
+})();
+
+// V12 seed: item categories, brands, units
+(function ensureSeedV12() {
+  if (localStorage.getItem("bizpos_seeded_v12")) return;
+
+  if (!localStorage.getItem("bizpos_item_categories")) {
+    const cats = [
+      {
+        id: "cat-001",
+        code: "CAT-001",
+        name: "Electronics",
+        description: "Electronic devices and gadgets",
+        status: "active",
+      },
+      {
+        id: "cat-002",
+        code: "CAT-002",
+        name: "Accessories",
+        description: "Device accessories and peripherals",
+        parentId: "cat-001",
+        status: "active",
+      },
+      {
+        id: "cat-003",
+        code: "CAT-003",
+        name: "Clothing",
+        description: "Apparel and fashion items",
+        status: "active",
+      },
+      {
+        id: "cat-004",
+        code: "CAT-004",
+        name: "Food & Beverage",
+        description: "Food, drinks and consumables",
+        status: "active",
+      },
+      {
+        id: "cat-005",
+        code: "CAT-005",
+        name: "Office Supplies",
+        description: "Office stationery and equipment",
+        status: "active",
+      },
+      {
+        id: "cat-006",
+        code: "CAT-006",
+        name: "Sports",
+        description: "Sports equipment and apparel",
+        status: "active",
+      },
+      {
+        id: "cat-007",
+        code: "CAT-007",
+        name: "Toys",
+        description: "Toys, games and hobbies",
+        status: "active",
+      },
+      {
+        id: "cat-008",
+        code: "CAT-008",
+        name: "Home & Garden",
+        description: "Home decor and gardening",
+        status: "active",
+      },
+    ];
+    localStorage.setItem("bizpos_item_categories", JSON.stringify(cats));
+  }
+
+  if (!localStorage.getItem("bizpos_item_brands")) {
+    const brands = [
+      {
+        id: "brand-001",
+        code: "BRD-001",
+        name: "Samsung",
+        description: "Samsung Electronics",
+        status: "active",
+      },
+      {
+        id: "brand-002",
+        code: "BRD-002",
+        name: "Apple",
+        description: "Apple Inc.",
+        status: "active",
+      },
+      {
+        id: "brand-003",
+        code: "BRD-003",
+        name: "Sony",
+        description: "Sony Corporation",
+        status: "active",
+      },
+      {
+        id: "brand-004",
+        code: "BRD-004",
+        name: "LG",
+        description: "LG Electronics",
+        status: "active",
+      },
+      {
+        id: "brand-005",
+        code: "BRD-005",
+        name: "Nike",
+        description: "Nike Inc.",
+        status: "active",
+      },
+      {
+        id: "brand-006",
+        code: "BRD-006",
+        name: "Adidas",
+        description: "Adidas AG",
+        status: "active",
+      },
+      {
+        id: "brand-007",
+        code: "BRD-007",
+        name: "Generic",
+        description: "Generic / Unbranded",
+        status: "active",
+      },
+      {
+        id: "brand-008",
+        code: "BRD-008",
+        name: "Anker",
+        description: "Anker Innovations",
+        status: "active",
+      },
+    ];
+    localStorage.setItem("bizpos_item_brands", JSON.stringify(brands));
+  }
+
+  if (!localStorage.getItem("bizpos_item_units")) {
+    const units = [
+      {
+        id: "unit-001",
+        code: "UOM-001",
+        name: "Piece",
+        abbreviation: "pcs",
+        isBaseUnit: true,
+        conversionFactor: 1,
+        status: "active",
+      },
+      {
+        id: "unit-002",
+        code: "UOM-002",
+        name: "Kilogram",
+        abbreviation: "kg",
+        isBaseUnit: false,
+        conversionFactor: 1000,
+        status: "active",
+      },
+      {
+        id: "unit-003",
+        code: "UOM-003",
+        name: "Litre",
+        abbreviation: "L",
+        isBaseUnit: false,
+        conversionFactor: 1,
+        status: "active",
+      },
+      {
+        id: "unit-004",
+        code: "UOM-004",
+        name: "Box",
+        abbreviation: "box",
+        isBaseUnit: false,
+        conversionFactor: 12,
+        status: "active",
+      },
+      {
+        id: "unit-005",
+        code: "UOM-005",
+        name: "Dozen",
+        abbreviation: "doz",
+        isBaseUnit: false,
+        conversionFactor: 12,
+        status: "active",
+      },
+      {
+        id: "unit-006",
+        code: "UOM-006",
+        name: "Meter",
+        abbreviation: "m",
+        isBaseUnit: false,
+        conversionFactor: 1,
+        status: "active",
+      },
+      {
+        id: "unit-007",
+        code: "UOM-007",
+        name: "Pair",
+        abbreviation: "pr",
+        isBaseUnit: false,
+        conversionFactor: 2,
+        status: "active",
+      },
+    ];
+    localStorage.setItem("bizpos_item_units", JSON.stringify(units));
+  }
+
+  // Update roles with new permissions
+  try {
+    const roles = JSON.parse(localStorage.getItem("bizpos_roles") || "[]");
+    const newPerms = [
+      "item_categories",
+      "item_brands",
+      "item_units",
+      "attachments",
+    ];
+    const updatedRoles = roles.map(
+      (r: { name: string; permissions: string[] }) => {
+        if (r.name === "Admin") {
+          return {
+            ...r,
+            permissions: [...new Set([...(r.permissions || []), ...newPerms])],
+          };
+        }
+        return r;
+      },
+    );
+    localStorage.setItem("bizpos_roles", JSON.stringify(updatedRoles));
+  } catch {
+    /* ignore */
+  }
+
+  // Update current session
+  try {
+    const session = JSON.parse(
+      localStorage.getItem("bizpos_session") || "null",
+    );
+    if (session && Array.isArray(session.permissions)) {
+      const newPerms = [
+        "item_categories",
+        "item_brands",
+        "item_units",
+        "attachments",
+      ];
+      const merged = [...new Set([...session.permissions, ...newPerms])];
+      localStorage.setItem(
+        "bizpos_session",
+        JSON.stringify({ ...session, permissions: merged }),
+      );
+    }
+  } catch {
+    /* ignore */
+  }
+
+  localStorage.setItem("bizpos_seeded_v12", "1");
+})();
+
+// V13 seed: stockMovements init, fix seed data
+(function ensureSeedV13() {
+  if (localStorage.getItem("bizpos_seeded_v13")) return;
+
+  // Init stockMovements if not present
+  if (!localStorage.getItem("bizpos_stock_movements")) {
+    localStorage.setItem("bizpos_stock_movements", JSON.stringify([]));
+  }
+
+  // Fix any existing seed sales with wrong shopId
+  try {
+    const sales = JSON.parse(localStorage.getItem("bizpos_sales") || "[]");
+    const updated = sales.map(
+      (s: {
+        id: string;
+        shopId?: string;
+        shopName?: string;
+        paymentMethod?: string;
+        taxAmount?: number;
+        promoSavings?: number;
+      }) => {
+        if (s.shopId === "shop-001") {
+          return {
+            ...s,
+            shopId: "shop1",
+            shopName: s.shopName || "Downtown Shop A",
+          };
+        }
+        return s;
+      },
+    );
+    localStorage.setItem("bizpos_sales", JSON.stringify(updated));
+  } catch {
+    /* ignore */
+  }
+
+  // Fix seed customers with groupId/groupName
+  try {
+    const customers = JSON.parse(
+      localStorage.getItem("bizpos_customers") || "[]",
+    );
+    const updated = customers.map(
+      (c: { id: string; groupId?: string; groupName?: string }) => {
+        if (c.id === "cust-001" && !c.groupId)
+          return { ...c, groupId: "cg1", groupName: "Retail" };
+        if (c.id === "cust-002" && !c.groupId)
+          return { ...c, groupId: "cg1", groupName: "Retail" };
+        if (c.id === "cust-003" && !c.groupId)
+          return { ...c, groupId: "cg3", groupName: "VIP" };
+        return c;
+      },
+    );
+    localStorage.setItem("bizpos_customers", JSON.stringify(updated));
+  } catch {
+    /* ignore */
+  }
+
+  // Fix seed POs supplier IDs
+  try {
+    const pos = JSON.parse(
+      localStorage.getItem("bizpos_purchase_orders") || "[]",
+    );
+    const updated = pos.map(
+      (po: { id: string; supplierId: string; supplierName: string }) => {
+        if (po.id === "po-1" && po.supplierId === "sup-1") {
+          return {
+            ...po,
+            supplierId: "sup-001",
+            supplierName: "Tech Distributors Ltd",
+          };
+        }
+        if (po.id === "po-2" && po.supplierId === "sup-2") {
+          return {
+            ...po,
+            supplierId: "sup-002",
+            supplierName: "Galaxy Electronics",
+          };
+        }
+        if (po.id === "po-3" && po.supplierId === "sup-1") {
+          return { ...po, supplierId: "sup-001" };
+        }
+        return po;
+      },
+    );
+    localStorage.setItem("bizpos_purchase_orders", JSON.stringify(updated));
+  } catch {
+    /* ignore */
+  }
+
+  localStorage.setItem("bizpos_seeded_v13", "1");
 })();
 
 function isLoggedIn() {
@@ -746,6 +1097,21 @@ const itemsRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: "/items",
   component: ItemsPage,
+});
+const itemCategoriesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/item-categories",
+  component: ItemCategoriesPage,
+});
+const itemBrandsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/item-brands",
+  component: ItemBrandsPage,
+});
+const itemUnitsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: "/item-units",
+  component: ItemUnitsPage,
 });
 const stockAdjustmentRoute = createRoute({
   getParentRoute: () => layoutRoute,
@@ -1041,6 +1407,9 @@ const routeTree = rootRoute.addChildren([
     salesListRoute,
     saleDetailRoute,
     itemsRoute,
+    itemCategoriesRoute,
+    itemBrandsRoute,
+    itemUnitsRoute,
     stockAdjustmentRoute,
     suppliersRoute,
     purchasesRoute,

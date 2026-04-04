@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -26,6 +27,9 @@ import {
 import { formatCurrency, getPrefs } from "@/lib/prefs";
 import {
   AlertCircle,
+  Clock,
+  PauseCircle,
+  PlayCircle,
   Printer,
   Search,
   ShoppingCart,
@@ -45,6 +49,17 @@ interface CartItem {
   subtotal: number;
 }
 
+interface HeldSale {
+  id: string;
+  label: string;
+  cart: CartItem[];
+  discount: string;
+  customerId: string;
+  paymentMethod: string;
+  saleType: "Cash" | "Credit";
+  heldAt: string;
+}
+
 interface LastSale {
   id: string;
   items: CartItem[];
@@ -60,6 +75,27 @@ interface LastSale {
   date: string;
 }
 
+const HELD_SALES_KEY = "bizpos_pos_held_sales";
+
+function getHeldSales(shopId: string, userId: string): HeldSale[] {
+  try {
+    const all = JSON.parse(localStorage.getItem(HELD_SALES_KEY) || "{}");
+    return all[`${shopId}_${userId}`] || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHeldSales(shopId: string, userId: string, held: HeldSale[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(HELD_SALES_KEY) || "{}");
+    all[`${shopId}_${userId}`] = held;
+    localStorage.setItem(HELD_SALES_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function POSPage() {
   const {
     items,
@@ -69,6 +105,7 @@ export default function POSPage() {
     shops,
     taxes,
     promotions,
+    itemCategories,
     addSale,
     addLog,
   } = useStore();
@@ -78,6 +115,7 @@ export default function POSPage() {
   const [saleType, setSaleType] = useState<"Cash" | "Credit">("Cash");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState("0");
   const [selectedShopId, setSelectedShopId] = useState("");
@@ -85,6 +123,8 @@ export default function POSPage() {
   const [noShopWarning, setNoShopWarning] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
+  const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
+  const [heldDialogOpen, setHeldDialogOpen] = useState(false);
   const initialized = useRef(false);
 
   // Preferences (currency, etc.)
@@ -94,6 +134,13 @@ export default function POSPage() {
     window.addEventListener("bizpos:prefs-changed", handler);
     return () => window.removeEventListener("bizpos:prefs-changed", handler);
   }, []);
+
+  // Load held sales when shop changes
+  useEffect(() => {
+    if (selectedShopId && currentUser?.id) {
+      setHeldSales(getHeldSales(selectedShopId, currentUser.id));
+    }
+  }, [selectedShopId, currentUser?.id]);
 
   // Auto-apply customer group discount
   useEffect(() => {
@@ -136,7 +183,6 @@ export default function POSPage() {
       : shops.filter(
           (s) => s.status === "Active" && s.assignedUserIds.includes(userId),
         );
-    // Try to restore last selected shop from localStorage
     const lastShopKey = `bizpos_pos_last_shop_${userId}`;
     const savedShopId = localStorage.getItem(lastShopKey);
     const savedShop = savedShopId
@@ -186,16 +232,30 @@ export default function POSPage() {
       setSelectedShopId(shopId);
       setSelectedWarehouse(shop.warehouseId);
       setShopDialogOpen(false);
-      // Remember choice so POS doesn't ask again next time
       const userId = currentUser?.id ?? "";
       localStorage.setItem(`bizpos_pos_last_shop_${userId}`, shopId);
     }
   };
 
+  // Categories sorted by seqNo
+  const sortedCategories = [...itemCategories]
+    .filter((c) => c.status === "active")
+    .sort((a, b) => {
+      const sa = a.seqNo ?? 999;
+      const sb = b.seqNo ?? 999;
+      return sa !== sb ? sa - sb : a.name.localeCompare(b.name);
+    });
+
   const warehouseItems = selectedWarehouse
     ? items.filter((i) => i.warehouseId === selectedWarehouse)
     : items;
-  const filteredItems = warehouseItems.filter(
+
+  const categoryFilteredItems = warehouseItems.filter((i) => {
+    if (selectedCategory === "all") return true;
+    return i.categoryId === selectedCategory;
+  });
+
+  const filteredItems = categoryFilteredItems.filter(
     (i) =>
       i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.sku.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -245,7 +305,6 @@ export default function POSPage() {
 
   const subtotal = cart.reduce((s, c) => s + c.subtotal, 0);
   const discountAmt = Number.parseFloat(discount) || 0;
-
   const today = new Date().toISOString().slice(0, 10);
 
   const promoSavings = cart.reduce((total, cartItem) => {
@@ -287,6 +346,69 @@ export default function POSPage() {
   const taxableAmount = Math.max(0, subtotal - discountAmt - promoSavings);
   const total = Math.max(0, taxableAmount + taxAmount);
 
+  // --- Hold / Resume ---
+  const handleHoldSale = () => {
+    if (cart.length === 0) {
+      toast.error("Cart is empty — nothing to hold");
+      return;
+    }
+    const userId = currentUser?.id ?? "guest";
+    const existing = getHeldSales(selectedShopId, userId);
+    const holdId = `HOLD-${Date.now()}`;
+    const heldAt = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const label = `Hold #${existing.length + 1} — ${cart.length} item(s) — ${heldAt}`;
+    const newHeld: HeldSale = {
+      id: holdId,
+      label,
+      cart: [...cart],
+      discount,
+      customerId: selectedCustomer,
+      paymentMethod,
+      saleType,
+      heldAt: new Date().toISOString(),
+    };
+    const updated = [...existing, newHeld];
+    saveHeldSales(selectedShopId, userId, updated);
+    setHeldSales(updated);
+    // Clear the current cart
+    setCart([]);
+    setDiscount("0");
+    setSelectedCustomer("");
+    toast.success(`Sale held — ${label}`);
+  };
+
+  const handleResumeHeld = (held: HeldSale) => {
+    if (cart.length > 0) {
+      toast.error(
+        "Please hold or clear the current cart first before resuming a held sale",
+      );
+      return;
+    }
+    setCart(held.cart);
+    setDiscount(held.discount);
+    setSelectedCustomer(held.customerId);
+    setPaymentMethod(held.paymentMethod);
+    setSaleType(held.saleType);
+    // Remove from held list
+    const userId = currentUser?.id ?? "guest";
+    const updated = heldSales.filter((h) => h.id !== held.id);
+    saveHeldSales(selectedShopId, userId, updated);
+    setHeldSales(updated);
+    setHeldDialogOpen(false);
+    toast.success("Sale resumed");
+  };
+
+  const handleDeleteHeld = (heldId: string) => {
+    const userId = currentUser?.id ?? "guest";
+    const updated = heldSales.filter((h) => h.id !== heldId);
+    saveHeldSales(selectedShopId, userId, updated);
+    setHeldSales(updated);
+    toast.success("Held sale removed");
+  };
+
   const handleNewSale = () => {
     setReceiptOpen(false);
     setLastSale(null);
@@ -320,6 +442,7 @@ export default function POSPage() {
       warehouseId: selectedWarehouse,
       warehouseName: warehouse.name,
       shopId: selectedShopId || undefined,
+      shopName: selectedShop?.name || "",
       saleType,
       items: cart.map((c) => ({
         itemId: c.itemId,
@@ -331,6 +454,9 @@ export default function POSPage() {
       subtotal,
       discount: discountAmt,
       total,
+      taxAmount,
+      promoSavings,
+      paymentMethod,
       paidAmount,
       balanceDue: total - paidAmount,
       status: saleType === "Cash" ? "Completed" : "Pending",
@@ -384,7 +510,7 @@ export default function POSPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 space-y-4">
       {/* Shop selector dialog */}
       <Dialog open={shopDialogOpen} onOpenChange={setShopDialogOpen}>
         <DialogContent
@@ -410,6 +536,89 @@ export default function POSPage() {
               </button>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Held Sales Dialog */}
+      <Dialog open={heldDialogOpen} onOpenChange={setHeldDialogOpen}>
+        <DialogContent
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="pos.held_dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PauseCircle className="h-5 w-5 text-orange-500" />
+              Held Sales ({heldSales.length})
+            </DialogTitle>
+          </DialogHeader>
+          {heldSales.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No held sales
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Items</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {heldSales.map((held) => {
+                  const heldTotal = held.cart.reduce(
+                    (s, c) => s + c.subtotal,
+                    0,
+                  );
+                  return (
+                    <TableRow key={held.id}>
+                      <TableCell>
+                        <div className="font-medium text-sm">{held.label}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {new Date(held.heldAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {held.cart.map((c) => c.itemName).join(", ")}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline">{held.cart.length}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatCurrency(heldTotal, prefs.currency)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            onClick={() => handleResumeHeld(held)}
+                            className="h-7 text-xs"
+                            data-ocid="pos.resume_button"
+                          >
+                            <PlayCircle className="h-3.5 w-3.5 mr-1" />
+                            Resume
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteHeld(held.id)}
+                            className="h-7 w-7 text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -446,7 +655,6 @@ export default function POSPage() {
                   <span className="font-semibold">{lastSale.customerName}</span>
                 </div>
               </div>
-
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -473,7 +681,6 @@ export default function POSPage() {
                   ))}
                 </TableBody>
               </Table>
-
               <div className="border-t pt-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
@@ -516,7 +723,6 @@ export default function POSPage() {
                   <span className="font-medium">{lastSale.paymentMethod}</span>
                 </div>
               </div>
-
               <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
@@ -540,35 +746,56 @@ export default function POSPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Point of Sale</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Point of Sale</h1>
           {selectedShop && (
-            <p className="text-gray-600 mt-1 flex items-center gap-1.5">
+            <p className="text-gray-500 mt-0.5 flex items-center gap-1.5 text-sm">
               <Store className="h-4 w-4" />
               {selectedShop.name} — {selectedShop.warehouseName}
             </p>
           )}
         </div>
-        {userShops.length > 1 && (
+        <div className="flex items-center gap-2">
+          {/* Held sales indicator */}
           <Button
             variant="outline"
-            onClick={() => setShopDialogOpen(true)}
-            data-ocid="pos.secondary_button"
+            size="sm"
+            onClick={() => setHeldDialogOpen(true)}
+            className="relative"
+            data-ocid="pos.held_sales_button"
           >
-            <Store className="h-4 w-4 mr-2" />
-            Change Shop
+            <PauseCircle className="h-4 w-4 mr-1.5 text-orange-500" />
+            Held Sales
+            {heldSales.length > 0 && (
+              <Badge className="ml-1.5 h-5 px-1.5 text-xs bg-orange-500">
+                {heldSales.length}
+              </Badge>
+            )}
           </Button>
-        )}
+          {userShops.length > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShopDialogOpen(true)}
+              data-ocid="pos.secondary_button"
+            >
+              <Store className="h-4 w-4 mr-1.5" />
+              Change Shop
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Items */}
+        <div className="lg:col-span-2 space-y-3">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex gap-3 flex-wrap">
                 <div className="space-y-1.5 flex-1 min-w-36">
-                  <Label>Warehouse</Label>
+                  <Label className="text-xs">Warehouse</Label>
                   <Select
                     value={selectedWarehouse}
                     onValueChange={setSelectedWarehouse}
@@ -586,7 +813,7 @@ export default function POSPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5 flex-1 min-w-36">
-                  <Label>Customer</Label>
+                  <Label className="text-xs">Customer</Label>
                   <Select
                     value={selectedCustomer}
                     onValueChange={setSelectedCustomer}
@@ -604,7 +831,7 @@ export default function POSPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Sale Type</Label>
+                  <Label className="text-xs">Sale Type</Label>
                   <Select
                     value={saleType}
                     onValueChange={(v) => setSaleType(v as "Cash" | "Credit")}
@@ -620,39 +847,87 @@ export default function POSPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
+              {/* Search */}
               <div className="relative mb-3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search items..."
+                  placeholder="Search items by name or SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
                   data-ocid="pos.search_input"
                 />
               </div>
+
+              {/* Category tabs */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("all")}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    selectedCategory === "all"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
+                  }`}
+                >
+                  All
+                </button>
+                {sortedCategories.map((cat) => {
+                  const catItemCount = warehouseItems.filter(
+                    (i) => i.categoryId === cat.id,
+                  ).length;
+                  if (catItemCount === 0) return null;
+                  return (
+                    <button
+                      type="button"
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        selectedCategory === cat.id
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
+                      }`}
+                    >
+                      {cat.name}
+                      <span className="ml-1 opacity-60">({catItemCount})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Item grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto">
                 {filteredItems.map((item) => (
                   <button
                     type="button"
                     key={item.id}
                     onClick={() => addToCart(item)}
-                    className="p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    className="p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={item.quantity === 0}
                     data-ocid="pos.primary_button"
                   >
-                    <div className="font-medium text-sm">{item.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">{item.sku}</div>
-                    <div className="text-primary font-bold mt-1">
+                    <div className="font-medium text-sm leading-tight">
+                      {item.name}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {item.sku}
+                    </div>
+                    <div className="text-primary font-bold mt-1 text-sm">
                       {formatCurrency(item.salePrice, prefs.currency)}
                     </div>
-                    <div className="text-xs text-gray-400">
-                      Stock: {item.quantity}
+                    <div
+                      className={`text-xs mt-0.5 ${
+                        item.quantity === 0 ? "text-red-500" : "text-gray-400"
+                      }`}
+                    >
+                      Stock:{" "}
+                      {item.quantity === 0 ? "Out of stock" : item.quantity}
                     </div>
                   </button>
                 ))}
                 {filteredItems.length === 0 && (
-                  <p className="col-span-3 text-center text-muted-foreground py-8">
+                  <p className="col-span-3 text-center text-muted-foreground py-8 text-sm">
                     No items found
                   </p>
                 )}
@@ -661,18 +936,19 @@ export default function POSPage() {
           </Card>
         </div>
 
+        {/* Right: Cart */}
         <div>
           <Card className="sticky top-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <ShoppingCart className="h-5 w-5" />
                 Cart ({cart.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+              <div className="space-y-2 max-h-64 overflow-y-auto mb-3">
                 {cart.length === 0 ? (
-                  <p className="text-center py-8 text-gray-500">
+                  <p className="text-center py-8 text-gray-400 text-sm">
                     Cart is empty
                   </p>
                 ) : (
@@ -681,8 +957,8 @@ export default function POSPage() {
                       key={item.itemId}
                       className="flex items-center gap-2 p-2 bg-gray-50 rounded"
                     >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
                           {item.itemName}
                         </div>
                         <div className="text-xs text-gray-500">
@@ -705,7 +981,7 @@ export default function POSPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => updateQty(item.itemId, 0)}
-                        className="h-7 w-7 text-red-500"
+                        className="h-7 w-7 text-red-500 shrink-0"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -713,6 +989,7 @@ export default function POSPage() {
                   ))
                 )}
               </div>
+
               <div className="space-y-2 border-t pt-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal:</span>
@@ -720,7 +997,7 @@ export default function POSPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600 whitespace-nowrap">
-                    Discount (manual):
+                    Discount:
                   </span>
                   <Input
                     type="number"
@@ -731,8 +1008,8 @@ export default function POSPage() {
                     data-ocid="pos.input"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm text-gray-600">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-600">
                     Payment Method
                   </Label>
                   <Select
@@ -778,14 +1055,27 @@ export default function POSPage() {
                   </span>
                 </div>
               </div>
-              <Button
-                onClick={handleCompleteSale}
-                disabled={cart.length === 0}
-                className="w-full mt-4 h-10"
-                data-ocid="pos.primary_button"
-              >
-                Complete Sale
-              </Button>
+
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="outline"
+                  onClick={handleHoldSale}
+                  disabled={cart.length === 0}
+                  className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                  data-ocid="pos.hold_button"
+                >
+                  <PauseCircle className="h-4 w-4 mr-1.5" />
+                  Hold
+                </Button>
+                <Button
+                  onClick={handleCompleteSale}
+                  disabled={cart.length === 0}
+                  className="flex-[2] h-10"
+                  data-ocid="pos.primary_button"
+                >
+                  Complete Sale
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

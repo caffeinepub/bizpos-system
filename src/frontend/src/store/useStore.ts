@@ -62,6 +62,8 @@ export interface Customer {
   phone: string;
   email: string;
   address: string;
+  groupId?: string;
+  groupName?: string;
   createdAt: string;
 }
 
@@ -156,15 +158,59 @@ export interface Payroll {
   createdAt: string;
 }
 
+export interface ItemCategory {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  parentId?: string;
+  seqNo: number;
+  status: "active" | "inactive";
+}
+
+export interface ItemBrand {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  status: "active" | "inactive";
+}
+
+export interface ItemUnit {
+  id: string;
+  code: string;
+  name: string;
+  abbreviation: string;
+  isBaseUnit: boolean;
+  conversionFactor: number;
+  status: "active" | "inactive";
+}
+
+export interface ItemVariant {
+  id: string;
+  variantType: string;
+  variantValue: string;
+  skuSuffix: string;
+  priceAdjustment: number;
+  quantity: number;
+  status: "active" | "inactive";
+}
+
 export interface Item {
   id: string;
   sku: string;
   name: string;
   category: string;
+  categoryId?: string;
+  brandId?: string;
+  unitId?: string;
+  variants?: ItemVariant[];
   costPrice: number;
   salePrice: number;
   quantity: number;
   warehouseId: string;
+  reorderLevel?: number;
+  reorderQty?: number;
 }
 
 export interface PurchaseItem {
@@ -204,11 +250,15 @@ export interface Sale {
   warehouseId: string;
   warehouseName: string;
   shopId?: string;
+  shopName?: string;
   saleType: "Cash" | "Credit";
   items: SaleItem[];
   subtotal: number;
   discount: number;
   total: number;
+  taxAmount?: number;
+  promoSavings?: number;
+  paymentMethod?: string;
   paidAmount: number;
   balanceDue: number;
   status: "Completed" | "Pending" | "Cancelled";
@@ -258,7 +308,34 @@ export interface Expense {
   amount: number;
   description: string;
   date: string;
+  categoryId?: string;
+  categoryName?: string;
+  paymentMethod?: string;
+  reference?: string;
+  createdBy?: string;
   createdAt: string;
+}
+
+export interface StockMovement {
+  id: string;
+  itemId: string;
+  itemName: string;
+  type:
+    | "Sale"
+    | "Purchase"
+    | "Adjustment"
+    | "GRN"
+    | "Transfer-Out"
+    | "Transfer-In"
+    | "Opening";
+  reference: string;
+  quantityChange: number;
+  quantityAfter: number;
+  warehouseId: string;
+  warehouseName: string;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
 }
 
 export interface Settings {
@@ -1884,6 +1961,8 @@ function createSeedData() {
       phone: "0300-1111111",
       email: "ahmed@email.com",
       address: "DHA Phase 5, Lahore",
+      groupId: "cg1",
+      groupName: "Retail",
       createdAt: "2024-01-05T00:00:00Z",
     },
     {
@@ -1892,6 +1971,8 @@ function createSeedData() {
       phone: "0311-2222222",
       email: "sara@email.com",
       address: "Gulshan, Karachi",
+      groupId: "cg1",
+      groupName: "Retail",
       createdAt: "2024-01-12T00:00:00Z",
     },
     {
@@ -1900,6 +1981,8 @@ function createSeedData() {
       phone: "-",
       email: "",
       address: "-",
+      groupId: "cg3",
+      groupName: "VIP",
       createdAt: "2024-01-01T00:00:00Z",
     },
   ];
@@ -1917,7 +2000,8 @@ function createSeedData() {
       customerName: "Ahmed Ali",
       warehouseId: "wh1",
       warehouseName: "Main Warehouse",
-      shopId: "shop-001",
+      shopId: "shop1",
+      shopName: "Downtown Shop A",
       saleType: "Cash",
       items: [
         {
@@ -1938,6 +2022,9 @@ function createSeedData() {
       subtotal: 58000,
       discount: 1000,
       total: 57000,
+      taxAmount: 0,
+      promoSavings: 0,
+      paymentMethod: "Cash",
       paidAmount: 57000,
       balanceDue: 0,
       status: "Completed",
@@ -1964,6 +2051,10 @@ function createSeedData() {
       subtotal: 13000,
       discount: 0,
       total: 13000,
+      taxAmount: 0,
+      promoSavings: 0,
+      paymentMethod: "JazzCash",
+      shopName: "Downtown Shop A",
       paidAmount: 5000,
       balanceDue: 8000,
       status: "Pending",
@@ -2615,8 +2706,8 @@ function createSeedData() {
     {
       id: "po-1",
       poNumber: "PO-2025-001",
-      supplierId: "sup-1",
-      supplierName: "TechSupply Co.",
+      supplierId: "sup-001",
+      supplierName: "Tech Distributors Ltd",
       warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       date: "2025-03-01",
@@ -2643,8 +2734,8 @@ function createSeedData() {
     {
       id: "po-2",
       poNumber: "PO-2025-002",
-      supplierId: "sup-2",
-      supplierName: "Global Merchandise Ltd",
+      supplierId: "sup-002",
+      supplierName: "Galaxy Electronics",
       warehouseId: "wh1",
       warehouseName: "Main Warehouse",
       date: "2025-03-05",
@@ -2671,7 +2762,7 @@ function createSeedData() {
     {
       id: "po-3",
       poNumber: "PO-2025-003",
-      supplierId: "sup-1",
+      supplierId: "sup-001",
       supplierName: "TechSupply Co.",
       warehouseId: "wh2",
       warehouseName: "Secondary Warehouse",
@@ -2762,7 +2853,6 @@ const KEYS = {
   leaveTypes: "bizpos_leave_types",
   leaveRequests: "bizpos_leave_requests",
   logs: "bizpos_logs",
-  seeded: "bizpos_seeded_v11",
   bankTransactions: "bizpos_bank_transactions",
   purchaseOrders: "bizpos_purchase_orders",
   taxes: "bizpos_taxes",
@@ -2779,6 +2869,11 @@ const KEYS = {
   shiftAssignments: "bizpos_shift_assignments",
   shiftClosings: "bizpos_shift_closings",
   salarySlips: "bizpos_salary_slips",
+  itemCategories: "bizpos_item_categories",
+  itemBrands: "bizpos_item_brands",
+  itemUnits: "bizpos_item_units",
+  stockMovements: "bizpos_stock_movements",
+  seeded: "bizpos_seeded_v13",
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -3200,6 +3295,7 @@ function initStore() {
       save(KEYS.shipments, shipments);
     }
 
+    save(KEYS.stockMovements, []);
     localStorage.setItem(KEYS.seeded, "true");
     // Seed departments
     const departments: Department[] = [
@@ -3577,6 +3673,240 @@ function initStore() {
       },
     ];
     save(KEYS.salarySlips, salarySlips);
+
+    // Seed ItemCategories
+    if (!localStorage.getItem(KEYS.itemCategories)) {
+      const cats: ItemCategory[] = [
+        {
+          id: "cat-001",
+          code: "CAT-001",
+          name: "Electronics",
+          description: "Electronic devices and gadgets",
+          seqNo: 1,
+          status: "active",
+        },
+        {
+          id: "cat-002",
+          code: "CAT-002",
+          name: "Accessories",
+          description: "Device accessories and peripherals",
+          parentId: "cat-001",
+          seqNo: 2,
+          status: "active",
+        },
+        {
+          id: "cat-003",
+          code: "CAT-003",
+          name: "Clothing",
+          description: "Apparel and fashion items",
+          seqNo: 3,
+          status: "active",
+        },
+        {
+          id: "cat-004",
+          code: "CAT-004",
+          name: "Food & Beverage",
+          description: "Food, drinks and consumables",
+          seqNo: 4,
+          status: "active",
+        },
+        {
+          id: "cat-005",
+          code: "CAT-005",
+          name: "Office Supplies",
+          description: "Office stationery and equipment",
+          seqNo: 5,
+          status: "active",
+        },
+        {
+          id: "cat-006",
+          code: "CAT-006",
+          name: "Sports",
+          description: "Sports equipment and apparel",
+          seqNo: 6,
+          status: "active",
+        },
+        {
+          id: "cat-007",
+          code: "CAT-007",
+          name: "Toys",
+          description: "Toys, games and hobbies",
+          seqNo: 7,
+          status: "active",
+        },
+        {
+          id: "cat-008",
+          code: "CAT-008",
+          name: "Home & Garden",
+          description: "Home decor and gardening",
+          seqNo: 8,
+          status: "active",
+        },
+      ];
+      save(KEYS.itemCategories, cats);
+    }
+
+    // Seed ItemBrands
+    if (!localStorage.getItem(KEYS.itemBrands)) {
+      const brands: ItemBrand[] = [
+        {
+          id: "brand-001",
+          code: "BRD-001",
+          name: "Samsung",
+          description: "Samsung Electronics",
+          status: "active",
+        },
+        {
+          id: "brand-002",
+          code: "BRD-002",
+          name: "Apple",
+          description: "Apple Inc.",
+          status: "active",
+        },
+        {
+          id: "brand-003",
+          code: "BRD-003",
+          name: "Sony",
+          description: "Sony Corporation",
+          status: "active",
+        },
+        {
+          id: "brand-004",
+          code: "BRD-004",
+          name: "LG",
+          description: "LG Electronics",
+          status: "active",
+        },
+        {
+          id: "brand-005",
+          code: "BRD-005",
+          name: "Nike",
+          description: "Nike Inc.",
+          status: "active",
+        },
+        {
+          id: "brand-006",
+          code: "BRD-006",
+          name: "Adidas",
+          description: "Adidas AG",
+          status: "active",
+        },
+        {
+          id: "brand-007",
+          code: "BRD-007",
+          name: "Generic",
+          description: "Generic / Unbranded",
+          status: "active",
+        },
+        {
+          id: "brand-008",
+          code: "BRD-008",
+          name: "Anker",
+          description: "Anker Innovations",
+          status: "active",
+        },
+      ];
+      save(KEYS.itemBrands, brands);
+    }
+
+    // Seed ItemUnits
+    if (!localStorage.getItem(KEYS.itemUnits)) {
+      const units: ItemUnit[] = [
+        {
+          id: "unit-001",
+          code: "UOM-001",
+          name: "Piece",
+          abbreviation: "pcs",
+          isBaseUnit: true,
+          conversionFactor: 1,
+          status: "active",
+        },
+        {
+          id: "unit-002",
+          code: "UOM-002",
+          name: "Kilogram",
+          abbreviation: "kg",
+          isBaseUnit: false,
+          conversionFactor: 1000,
+          status: "active",
+        },
+        {
+          id: "unit-003",
+          code: "UOM-003",
+          name: "Litre",
+          abbreviation: "L",
+          isBaseUnit: false,
+          conversionFactor: 1,
+          status: "active",
+        },
+        {
+          id: "unit-004",
+          code: "UOM-004",
+          name: "Box",
+          abbreviation: "box",
+          isBaseUnit: false,
+          conversionFactor: 12,
+          status: "active",
+        },
+        {
+          id: "unit-005",
+          code: "UOM-005",
+          name: "Dozen",
+          abbreviation: "doz",
+          isBaseUnit: false,
+          conversionFactor: 12,
+          status: "active",
+        },
+        {
+          id: "unit-006",
+          code: "UOM-006",
+          name: "Meter",
+          abbreviation: "m",
+          isBaseUnit: false,
+          conversionFactor: 1,
+          status: "active",
+        },
+        {
+          id: "unit-007",
+          code: "UOM-007",
+          name: "Pair",
+          abbreviation: "pr",
+          isBaseUnit: false,
+          conversionFactor: 2,
+          status: "active",
+        },
+      ];
+      save(KEYS.itemUnits, units);
+    }
+
+    // Update items with categoryId/brandId/unitId links
+    try {
+      const existingItems = load<Item[]>(KEYS.items, []);
+      const updatedItems = existingItems.map((item) => {
+        const updates: Partial<Item> = {};
+        if (!item.categoryId) {
+          if (item.category === "Electronics") updates.categoryId = "cat-001";
+          else if (item.category === "Accessories")
+            updates.categoryId = "cat-002";
+        }
+        if (!item.brandId) {
+          if (item.name.toLowerCase().includes("samsung"))
+            updates.brandId = "brand-001";
+          else if (
+            item.name.toLowerCase().includes("iphone") ||
+            item.name.toLowerCase().includes("apple")
+          )
+            updates.brandId = "brand-002";
+          else if (item.name.toLowerCase().includes("sony"))
+            updates.brandId = "brand-003";
+        }
+        if (!item.unitId) updates.unitId = "unit-001";
+        return { ...item, ...updates };
+      });
+      save(KEYS.items, updatedItems);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -3754,6 +4084,10 @@ interface StoreState {
   shiftAssignments: EmployeeShiftAssignment[];
   shiftClosings: ShiftClosing[];
   salarySlips: SalarySlip[];
+  itemCategories: ItemCategory[];
+  itemBrands: ItemBrand[];
+  itemUnits: ItemUnit[];
+  stockMovements: StockMovement[];
 }
 
 function readAll(): StoreState {
@@ -3805,6 +4139,10 @@ function readAll(): StoreState {
     ),
     shiftClosings: load<ShiftClosing[]>(KEYS.shiftClosings, []),
     salarySlips: load<SalarySlip[]>(KEYS.salarySlips, []),
+    itemCategories: load<ItemCategory[]>(KEYS.itemCategories, []),
+    itemBrands: load<ItemBrand[]>(KEYS.itemBrands, []),
+    itemUnits: load<ItemUnit[]>(KEYS.itemUnits, []),
+    stockMovements: load<StockMovement[]>(KEYS.stockMovements, []),
   };
 }
 
@@ -4153,6 +4491,24 @@ export function useStore() {
     );
   }, []);
 
+  // ---- Stock Movements ----
+  const addStockMovement = useCallback(
+    (mv: Omit<StockMovement, "id" | "createdAt" | "createdBy">) => {
+      const user = getSessionUser();
+      const newMv: StockMovement = {
+        ...mv,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        createdBy: user,
+      };
+      save(KEYS.stockMovements, [
+        ...load<StockMovement[]>(KEYS.stockMovements, []),
+        newMv,
+      ]);
+    },
+    [],
+  );
+
   // ---- Sales ----
   const addSale = useCallback(
     (sale: Sale) => {
@@ -4170,9 +4526,24 @@ export function useStore() {
       });
       save(KEYS.items, updatedItems);
       save(KEYS.sales, [...load<Sale[]>(KEYS.sales, []), sale]);
+      // Record stock movements
+      for (const si of sale.items) {
+        const item = currentItems.find((i) => i.id === si.itemId);
+        addStockMovement({
+          itemId: si.itemId,
+          itemName: si.itemName,
+          type: "Sale",
+          reference: sale.id,
+          quantityChange: -si.quantity,
+          quantityAfter: item ? Math.max(0, item.quantity - si.quantity) : 0,
+          warehouseId: sale.warehouseId,
+          warehouseName: sale.warehouseName,
+          notes: `Sale to ${sale.customerName}`,
+        });
+      }
       _log("Sales", "create", `Created sale ${sale.id}`);
     },
-    [_log],
+    [_log, addStockMovement],
   );
   const updateSale = useCallback((id: string, sale: Partial<Sale>) => {
     save(
@@ -4239,6 +4610,21 @@ export function useStore() {
             return item;
           });
           save(KEYS.items, updatedItems);
+          // Record stock movements
+          for (const pi of mergedPurchase.items || []) {
+            const item = currentItems.find((i) => i.id === pi.itemId);
+            addStockMovement({
+              itemId: pi.itemId,
+              itemName: pi.itemName,
+              type: "Purchase",
+              reference: mergedPurchase.id,
+              quantityChange: pi.quantity,
+              quantityAfter: item ? item.quantity + pi.quantity : pi.quantity,
+              warehouseId: mergedPurchase.warehouseId,
+              warehouseName: mergedPurchase.warehouseName,
+              notes: `Purchase received from ${mergedPurchase.supplierName}`,
+            });
+          }
         } else if (oldStatus === "Received" && newStatus !== "Received") {
           // Decrement stock (e.g., cancelled after received)
           const updatedItems = currentItems.map((item) => {
@@ -4254,7 +4640,7 @@ export function useStore() {
         }
       }
     },
-    [],
+    [addStockMovement],
   );
   const deletePurchase = useCallback((id: string) => {
     save(
@@ -4872,6 +5258,78 @@ export function useStore() {
     );
   }, []);
 
+  // ---- ItemCategories ----
+  const addItemCategory = useCallback((cat: Omit<ItemCategory, "id">) => {
+    const newCat = { ...cat, id: generateId() };
+    save(KEYS.itemCategories, [
+      ...load<ItemCategory[]>(KEYS.itemCategories, []),
+      newCat,
+    ]);
+  }, []);
+  const updateItemCategory = useCallback(
+    (id: string, cat: Partial<ItemCategory>) => {
+      save(
+        KEYS.itemCategories,
+        load<ItemCategory[]>(KEYS.itemCategories, []).map((x) =>
+          x.id === id ? { ...x, ...cat } : x,
+        ),
+      );
+    },
+    [],
+  );
+  const deleteItemCategory = useCallback((id: string) => {
+    save(
+      KEYS.itemCategories,
+      load<ItemCategory[]>(KEYS.itemCategories, []).filter((x) => x.id !== id),
+    );
+  }, []);
+
+  // ---- ItemBrands ----
+  const addItemBrand = useCallback((brand: Omit<ItemBrand, "id">) => {
+    const newBrand = { ...brand, id: generateId() };
+    save(KEYS.itemBrands, [
+      ...load<ItemBrand[]>(KEYS.itemBrands, []),
+      newBrand,
+    ]);
+  }, []);
+  const updateItemBrand = useCallback(
+    (id: string, brand: Partial<ItemBrand>) => {
+      save(
+        KEYS.itemBrands,
+        load<ItemBrand[]>(KEYS.itemBrands, []).map((x) =>
+          x.id === id ? { ...x, ...brand } : x,
+        ),
+      );
+    },
+    [],
+  );
+  const deleteItemBrand = useCallback((id: string) => {
+    save(
+      KEYS.itemBrands,
+      load<ItemBrand[]>(KEYS.itemBrands, []).filter((x) => x.id !== id),
+    );
+  }, []);
+
+  // ---- ItemUnits ----
+  const addItemUnit = useCallback((unit: Omit<ItemUnit, "id">) => {
+    const newUnit = { ...unit, id: generateId() };
+    save(KEYS.itemUnits, [...load<ItemUnit[]>(KEYS.itemUnits, []), newUnit]);
+  }, []);
+  const updateItemUnit = useCallback((id: string, unit: Partial<ItemUnit>) => {
+    save(
+      KEYS.itemUnits,
+      load<ItemUnit[]>(KEYS.itemUnits, []).map((x) =>
+        x.id === id ? { ...x, ...unit } : x,
+      ),
+    );
+  }, []);
+  const deleteItemUnit = useCallback((id: string) => {
+    save(
+      KEYS.itemUnits,
+      load<ItemUnit[]>(KEYS.itemUnits, []).filter((x) => x.id !== id),
+    );
+  }, []);
+
   const addLog = useCallback(
     (module: string, action: Log["action"], details: string) => {
       _log(module, action, details);
@@ -4993,5 +5451,16 @@ export function useStore() {
     addSalarySlip,
     updateSalarySlip,
     deleteSalarySlip,
+    addItemCategory,
+    updateItemCategory,
+    deleteItemCategory,
+    addItemBrand,
+    updateItemBrand,
+    deleteItemBrand,
+    addItemUnit,
+    updateItemUnit,
+    deleteItemUnit,
+    addStockMovement,
+    stockMovements: state.stockMovements,
   };
 }

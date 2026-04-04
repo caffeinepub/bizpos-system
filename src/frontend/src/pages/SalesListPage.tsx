@@ -42,7 +42,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SalesListPage() {
-  const { sales, warehouses, deleteSale, addLog } = useStore();
+  const { sales, warehouses, shops, deleteSale, addLog } = useStore();
   const { currentUser, getAccessibleShopIds } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -78,6 +78,8 @@ export default function SalesListPage() {
       s.id,
       s.saleDate,
       s.customerName,
+      s.shopName || shops.find((sh) => sh.id === s.shopId)?.name || "—",
+      s.warehouseName,
       s.items.length,
       s.total.toLocaleString(),
       s.paidAmount.toLocaleString(),
@@ -100,6 +102,8 @@ export default function SalesListPage() {
         "Invoice#",
         "Date",
         "Customer",
+        "Shop",
+        "Warehouse",
         "Items",
         "Total",
         "Paid",
@@ -121,6 +125,8 @@ export default function SalesListPage() {
       s.id,
       s.saleDate,
       s.customerName,
+      s.shopName || shops.find((sh) => sh.id === s.shopId)?.name || "—",
+      s.warehouseName,
       s.items.length,
       s.total,
       s.paidAmount,
@@ -144,6 +150,8 @@ export default function SalesListPage() {
         "Invoice#",
         "Date",
         "Customer",
+        "Shop",
+        "Warehouse",
         "Items",
         "Total",
         "Paid",
@@ -262,6 +270,7 @@ export default function SalesListPage() {
             <TableRow>
               <TableHead>Sale ID</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Shop</TableHead>
               <TableHead>Warehouse</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Items</TableHead>
@@ -276,7 +285,7 @@ export default function SalesListPage() {
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={11}
                   className="text-center py-8 text-muted-foreground"
                   data-ocid="sales.empty_state"
                 >
@@ -290,6 +299,11 @@ export default function SalesListPage() {
                     {sale.id}
                   </TableCell>
                   <TableCell>{sale.customerName}</TableCell>
+                  <TableCell>
+                    {sale.shopName ||
+                      shops.find((sh) => sh.id === sale.shopId)?.name ||
+                      "—"}
+                  </TableCell>
                   <TableCell>{sale.warehouseName}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{sale.saleType}</Badge>

@@ -88,8 +88,12 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     group: "Inventory",
     permissions: [
       { key: "inventory", label: "Items / Inventory" },
+      { key: "item_categories", label: "Item Categories" },
+      { key: "item_brands", label: "Item Brands" },
+      { key: "item_units", label: "Units of Measure" },
       { key: "stock_adjustment", label: "Stock Adjustment" },
       { key: "warehouse_stock", label: "Warehouse Stock View" },
+      { key: "attachments", label: "Document Attachments" },
     ],
   },
   {

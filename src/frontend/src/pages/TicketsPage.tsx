@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import AttachmentManager from "../components/AttachmentManager";
 import { useAuth } from "../context/AuthContext";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
@@ -894,6 +895,12 @@ export default function TicketsPage() {
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
+                </TabsContent>
+                <TabsContent value="attachments">
+                  <AttachmentManager
+                    moduleKey="tickets"
+                    recordId={selectedTicket.id}
+                  />
                 </TabsContent>
               </Tabs>
             </>

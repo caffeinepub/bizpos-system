@@ -40,9 +40,26 @@ import { toast } from "sonner";
 import { useStore } from "../store/useStore";
 import type { Expense } from "../store/useStore";
 
+interface ExpenseCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+function loadExpenseCategories(): ExpenseCategory[] {
+  try {
+    return JSON.parse(
+      localStorage.getItem("bizpos_expense_categories") || "[]",
+    );
+  } catch {
+    return [];
+  }
+}
+
 export default function ExpensesPage() {
   const { expenses, accounts, addExpense, updateExpense, deleteExpense } =
     useStore();
+  const expenseCategories = loadExpenseCategories();
   const expenseAccounts = accounts.filter(
     (a) => a.type === "Expense" || a.type === "COGS",
   );
@@ -54,6 +71,9 @@ export default function ExpensesPage() {
     amount: "",
     description: "",
     date: new Date().toISOString().slice(0, 10),
+    categoryId: "",
+    paymentMethod: "",
+    reference: "",
   });
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -65,6 +85,9 @@ export default function ExpensesPage() {
       amount: "",
       description: "",
       date: new Date().toISOString().slice(0, 10),
+      categoryId: "",
+      paymentMethod: "",
+      reference: "",
     });
     setDialogOpen(true);
   };
@@ -75,6 +98,9 @@ export default function ExpensesPage() {
       amount: exp.amount.toString(),
       description: exp.description,
       date: exp.date,
+      categoryId: exp.categoryId || "",
+      paymentMethod: exp.paymentMethod || "",
+      reference: exp.reference || "",
     });
     setDialogOpen(true);
   };
@@ -85,12 +111,27 @@ export default function ExpensesPage() {
       return;
     }
     const acc = accounts.find((a) => a.id === form.accountId);
+    const cat = expenseCategories.find((c) => c.id === form.categoryId);
+    const sessionUser = (() => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("bizpos_session") || "{}").name || ""
+        );
+      } catch {
+        return "";
+      }
+    })();
     const expenseData = {
       accountId: form.accountId,
       accountName: acc?.name || "",
       amount: Number.parseFloat(form.amount) || 0,
       description: form.description,
       date: form.date,
+      categoryId: form.categoryId || undefined,
+      categoryName: cat?.name || undefined,
+      paymentMethod: form.paymentMethod || undefined,
+      reference: form.reference || undefined,
+      createdBy: sessionUser || undefined,
     };
     if (editingExpense) {
       updateExpense(editingExpense.id, expenseData);
@@ -148,6 +189,9 @@ export default function ExpensesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Account</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Reference</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -158,7 +202,7 @@ export default function ExpensesPage() {
               {expenses.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={8}
                     className="text-center py-8 text-muted-foreground"
                     data-ocid="expenses.empty_state"
                   >
@@ -169,6 +213,9 @@ export default function ExpensesPage() {
                 expenses.map((exp, i) => (
                   <TableRow key={exp.id} data-ocid={`expenses.item.${i + 1}`}>
                     <TableCell>{exp.accountName}</TableCell>
+                    <TableCell>{exp.categoryName || "—"}</TableCell>
+                    <TableCell>{exp.paymentMethod || "—"}</TableCell>
+                    <TableCell>{exp.reference || "—"}</TableCell>
                     <TableCell>{exp.description}</TableCell>
                     <TableCell>{exp.date}</TableCell>
                     <TableCell className="text-right font-semibold text-red-600">
@@ -252,6 +299,60 @@ export default function ExpensesPage() {
                   data-ocid="expenses.input"
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select
+                  value={form.categoryId || "none"}
+                  onValueChange={(v) =>
+                    setForm({ ...form, categoryId: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger data-ocid="expenses.select">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Category</SelectItem>
+                    {expenseCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select
+                  value={form.paymentMethod || "none"}
+                  onValueChange={(v) =>
+                    setForm({ ...form, paymentMethod: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger data-ocid="expenses.select">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="Cheque">Cheque</SelectItem>
+                    <SelectItem value="Credit Card">Credit Card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Reference / Voucher No</Label>
+              <Input
+                value={form.reference}
+                onChange={(e) =>
+                  setForm({ ...form, reference: e.target.value })
+                }
+                placeholder="e.g. VCH-001"
+                data-ocid="expenses.input"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description *</Label>

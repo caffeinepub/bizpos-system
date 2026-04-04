@@ -35,12 +35,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Barcode, Edit, Package, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import type { Item, ItemVariant } from "../store/useStore";
 import { useStore } from "../store/useStore";
-import type { Item } from "../store/useStore";
 import { exportExcel, exportPDF } from "../utils/exportUtils";
 
 // Simple visual barcode renderer using canvas
@@ -53,7 +54,6 @@ function BarcodeCanvas({ value }: { value: string }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Simple Code-like pattern
     const width = 280;
     const height = 80;
     canvas.width = width;
@@ -61,17 +61,14 @@ function BarcodeCanvas({ value }: { value: string }) {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, width, height);
 
-    // Generate bar pattern from string chars
     const bars: number[] = [];
-    // Start guard
     bars.push(1, 0, 1);
     for (let i = 0; i < value.length; i++) {
       const c = value.charCodeAt(i);
       const pattern = c.toString(2).padStart(8, "0");
       for (const bit of pattern) bars.push(Number(bit));
-      bars.push(0); // separator
+      bars.push(0);
     }
-    // End guard
     bars.push(1, 0, 1);
 
     const barWidth = Math.max(1, Math.floor((width - 20) / bars.length));
@@ -82,7 +79,6 @@ function BarcodeCanvas({ value }: { value: string }) {
       x += barWidth;
     }
 
-    // Label
     ctx.fillStyle = "black";
     ctx.font = "11px monospace";
     ctx.textAlign = "center";
@@ -92,28 +88,171 @@ function BarcodeCanvas({ value }: { value: string }) {
   return <canvas ref={canvasRef} className="border rounded" />;
 }
 
+const EMPTY_VARIANT: Omit<ItemVariant, "id"> = {
+  variantType: "",
+  variantValue: "",
+  skuSuffix: "",
+  priceAdjustment: 0,
+  quantity: 0,
+  status: "active",
+};
+
+interface StockMovementEntry {
+  id: string;
+  itemId: string;
+  type: string;
+  reference: string;
+  quantityChange: number;
+  quantityAfter: number;
+  warehouseId: string;
+  warehouseName: string;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+function StockLedgerTab({ itemId }: { itemId: string }) {
+  const movements: StockMovementEntry[] = (() => {
+    try {
+      const all: StockMovementEntry[] = JSON.parse(
+        localStorage.getItem("bizpos_stock_movements") || "[]",
+      );
+      return all
+        .filter((m) => m.itemId === itemId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } catch {
+      return [];
+    }
+  })();
+
+  if (movements.length === 0) {
+    return (
+      <div
+        className="text-center py-12 text-muted-foreground"
+        data-ocid="items.empty_state"
+      >
+        <Package className="h-10 w-10 mx-auto mb-2 opacity-40" />
+        <p>No stock movements recorded yet</p>
+        <p className="text-xs mt-1">
+          Movements are recorded when items are sold, purchased, adjusted, or
+          transferred
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Reference</TableHead>
+            <TableHead className="text-right">Qty Change</TableHead>
+            <TableHead className="text-right">Balance After</TableHead>
+            <TableHead>Warehouse</TableHead>
+            <TableHead>Notes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {movements.map((mv, i) => (
+            <TableRow
+              key={mv.id}
+              data-ocid={`items.stock_ledger.item.${i + 1}`}
+            >
+              <TableCell className="text-sm">
+                {new Date(mv.createdAt).toLocaleDateString()}
+              </TableCell>
+              <TableCell>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    mv.type === "Sale"
+                      ? "bg-red-100 text-red-700"
+                      : mv.type === "Purchase"
+                        ? "bg-green-100 text-green-700"
+                        : mv.type === "GRN"
+                          ? "bg-blue-100 text-blue-700"
+                          : mv.type === "Transfer-In"
+                            ? "bg-purple-100 text-purple-700"
+                            : mv.type === "Transfer-Out"
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {mv.type}
+                </span>
+              </TableCell>
+              <TableCell className="font-mono text-sm">
+                {mv.reference}
+              </TableCell>
+              <TableCell
+                className={`text-right font-semibold ${mv.quantityChange < 0 ? "text-red-600" : "text-green-600"}`}
+              >
+                {mv.quantityChange > 0 ? "+" : ""}
+                {mv.quantityChange}
+              </TableCell>
+              <TableCell className="text-right">{mv.quantityAfter}</TableCell>
+              <TableCell className="text-sm">{mv.warehouseName}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {mv.notes || "—"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export default function ItemsPage() {
-  const { items, warehouses, addItem, updateItem, deleteItem, addLog } =
-    useStore();
+  const {
+    items,
+    warehouses,
+    itemCategories,
+    itemBrands,
+    itemUnits,
+    addItem,
+    updateItem,
+    deleteItem,
+    addLog,
+  } = useStore();
   const { currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [filterWarehouse, setFilterWarehouse] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterBrand, setFilterBrand] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [variants, setVariants] = useState<ItemVariant[]>([]);
+  const [showVariantForm, setShowVariantForm] = useState(false);
+  const [variantForm, setVariantForm] =
+    useState<Omit<ItemVariant, "id">>(EMPTY_VARIANT);
+  const [editingVariantIdx, setEditingVariantIdx] = useState<number | null>(
+    null,
+  );
+
   const [form, setForm] = useState({
     sku: "",
     name: "",
     category: "",
+    categoryId: "",
+    brandId: "",
+    unitId: "",
     costPrice: "",
     salePrice: "",
-    quantity: "",
+    quantity: "0",
     warehouseId: "",
     reorderLevel: "10",
     reorderQty: "50",
   });
+
+  const activeCategories = itemCategories.filter((c) => c.status === "active");
+  const activeBrands = itemBrands.filter((b) => b.status === "active");
+  const activeUnits = itemUnits.filter((u) => u.status === "active");
 
   const filtered = items.filter((i) => {
     const matchSearch =
@@ -121,7 +260,12 @@ export default function ItemsPage() {
       i.sku.toLowerCase().includes(search.toLowerCase());
     const matchWarehouse =
       filterWarehouse === "all" || i.warehouseId === filterWarehouse;
-    return matchSearch && matchWarehouse;
+    const matchCategory =
+      filterCategory === "all" ||
+      i.categoryId === filterCategory ||
+      i.category === filterCategory;
+    const matchBrand = filterBrand === "all" || i.brandId === filterBrand;
+    return matchSearch && matchWarehouse && matchCategory && matchBrand;
   });
 
   const toggleSelect = (id: string) => {
@@ -143,10 +287,14 @@ export default function ItemsPage() {
 
   const openAdd = () => {
     setEditingItem(null);
+    setVariants([]);
     setForm({
       sku: "",
       name: "",
       category: "",
+      categoryId: "",
+      brandId: "",
+      unitId: activeUnits[0]?.id || "",
       costPrice: "",
       salePrice: "",
       quantity: "0",
@@ -159,16 +307,20 @@ export default function ItemsPage() {
 
   const openEdit = (item: Item) => {
     setEditingItem(item);
+    setVariants(item.variants || []);
     setForm({
       sku: item.sku,
       name: item.name,
       category: item.category || "",
+      categoryId: item.categoryId || "",
+      brandId: item.brandId || "",
+      unitId: item.unitId || "",
       costPrice: item.costPrice.toString(),
       salePrice: item.salePrice.toString(),
       quantity: item.quantity.toString(),
       warehouseId: item.warehouseId,
-      reorderLevel: ((item as any).reorderLevel ?? 10).toString(),
-      reorderQty: ((item as any).reorderQty ?? 50).toString(),
+      reorderLevel: (item.reorderLevel ?? 10).toString(),
+      reorderQty: (item.reorderQty ?? 50).toString(),
     });
     setDialogOpen(true);
   };
@@ -178,10 +330,18 @@ export default function ItemsPage() {
       toast.error("Fill all required fields");
       return;
     }
+    // Resolve category name from categoryId for backward compat
+    const selectedCat = activeCategories.find((c) => c.id === form.categoryId);
+    const categoryName = selectedCat?.name || form.category || "";
+
     const itemData = {
       sku: form.sku,
       name: form.name,
-      category: form.category,
+      category: categoryName,
+      categoryId: form.categoryId || undefined,
+      brandId: form.brandId || undefined,
+      unitId: form.unitId || undefined,
+      variants: variants.length > 0 ? variants : undefined,
       costPrice: Number.parseFloat(form.costPrice) || 0,
       salePrice: Number.parseFloat(form.salePrice) || 0,
       quantity: Number.parseInt(form.quantity) || 0,
@@ -204,6 +364,12 @@ export default function ItemsPage() {
   const getWarehouseName = (id: string) =>
     warehouses.find((w) => w.id === id)?.name || "Unknown";
 
+  const getBrandName = (brandId?: string) =>
+    itemBrands.find((b) => b.id === brandId)?.name || "";
+
+  const getUnitAbbr = (unitId?: string) =>
+    itemUnits.find((u) => u.id === unitId)?.abbreviation || "";
+
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
     for (const id of selectedIds) {
@@ -220,6 +386,7 @@ export default function ItemsPage() {
       i.sku,
       i.name,
       i.category,
+      getBrandName(i.brandId),
       getWarehouseName(i.warehouseId),
       i.costPrice.toLocaleString(),
       i.salePrice.toLocaleString(),
@@ -227,7 +394,16 @@ export default function ItemsPage() {
     ]);
     exportPDF(
       "Items Export",
-      ["SKU", "Name", "Category", "Warehouse", "Cost", "Sale Price", "Qty"],
+      [
+        "SKU",
+        "Name",
+        "Category",
+        "Brand",
+        "Warehouse",
+        "Cost",
+        "Sale Price",
+        "Qty",
+      ],
       rows,
       "items-export.pdf",
       {
@@ -244,11 +420,12 @@ export default function ItemsPage() {
       i.sku,
       i.name,
       i.category,
+      getBrandName(i.brandId),
       getWarehouseName(i.warehouseId),
       i.costPrice,
       i.salePrice,
       i.quantity,
-      (i as any).reorderLevel ?? 10,
+      i.reorderLevel ?? 10,
     ]);
     exportExcel(
       "items-export.xlsx",
@@ -257,6 +434,7 @@ export default function ItemsPage() {
         "SKU",
         "Name",
         "Category",
+        "Brand",
         "Warehouse",
         "Cost",
         "Sale Price",
@@ -292,8 +470,48 @@ export default function ItemsPage() {
     win.print();
   };
 
+  // Variant handlers
+  const handleAddVariant = () => {
+    if (!variantForm.variantType || !variantForm.variantValue) {
+      toast.error("Variant Type and Value are required");
+      return;
+    }
+    const newVariant: ItemVariant = {
+      ...variantForm,
+      id: `var-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    };
+    if (editingVariantIdx !== null) {
+      setVariants((prev) =>
+        prev.map((v, i) => (i === editingVariantIdx ? newVariant : v)),
+      );
+      setEditingVariantIdx(null);
+    } else {
+      setVariants((prev) => [...prev, newVariant]);
+    }
+    setVariantForm(EMPTY_VARIANT);
+    setShowVariantForm(false);
+  };
+
+  const handleEditVariant = (idx: number) => {
+    const v = variants[idx];
+    setVariantForm({
+      variantType: v.variantType,
+      variantValue: v.variantValue,
+      skuSuffix: v.skuSuffix,
+      priceAdjustment: v.priceAdjustment,
+      quantity: v.quantity,
+      status: v.status,
+    });
+    setEditingVariantIdx(idx);
+    setShowVariantForm(true);
+  };
+
+  const handleDeleteVariant = (idx: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const lowStockCount = items.filter((i) => {
-    const level = (i as any).reorderLevel;
+    const level = i.reorderLevel;
     return level != null ? i.quantity <= level : i.quantity < 10;
   }).length;
 
@@ -361,28 +579,29 @@ export default function ItemsPage() {
             size="sm"
             variant="ghost"
             onClick={() => setSelectedIds(new Set())}
+            data-ocid="items.cancel_button"
           >
-            Deselect All
+            Clear
           </Button>
         </div>
       )}
 
       <Card>
-        <CardHeader>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <CardHeader className="pb-2 pt-3 px-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                className="pl-8"
+                placeholder="Search items..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search items..."
-                className="pl-9"
                 data-ocid="items.search_input"
               />
             </div>
             <Select value={filterWarehouse} onValueChange={setFilterWarehouse}>
-              <SelectTrigger className="w-48" data-ocid="items.select">
-                <SelectValue placeholder="All Warehouses" />
+              <SelectTrigger className="w-40" data-ocid="items.select">
+                <SelectValue placeholder="Warehouse" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Warehouses</SelectItem>
@@ -393,10 +612,36 @@ export default function ItemsPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-40" data-ocid="items.select">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {activeCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterBrand} onValueChange={setFilterBrand}>
+              <SelectTrigger className="w-36" data-ocid="items.select">
+                <SelectValue placeholder="Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {activeBrands.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
+        <CardContent className="p-0">
+          <Table data-ocid="items.table">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
@@ -412,6 +657,7 @@ export default function ItemsPage() {
                 <TableHead>SKU</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Brand</TableHead>
                 <TableHead>Warehouse</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead className="text-right">Sale Price</TableHead>
@@ -424,7 +670,7 @@ export default function ItemsPage() {
               {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={11}
                     className="text-center py-8 text-muted-foreground"
                     data-ocid="items.empty_state"
                   >
@@ -434,9 +680,10 @@ export default function ItemsPage() {
               ) : (
                 filtered.map((item, i) => {
                   const isLowStock =
-                    (item as any).reorderLevel != null
-                      ? item.quantity <= (item as any).reorderLevel
+                    item.reorderLevel != null
+                      ? item.quantity <= item.reorderLevel
                       : item.quantity < 10;
+                  const unitAbbr = getUnitAbbr(item.unitId);
                   return (
                     <TableRow
                       key={item.id}
@@ -453,10 +700,22 @@ export default function ItemsPage() {
                       <TableCell className="font-mono text-sm">
                         {item.sku}
                       </TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {item.name}
+                        {item.variants && item.variants.length > 0 && (
+                          <span className="ml-1 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                            {item.variants.length} variants
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
                           {item.category || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {getBrandName(item.brandId) || "—"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -479,10 +738,11 @@ export default function ItemsPage() {
                           }
                         >
                           {item.quantity}
+                          {unitAbbr ? ` ${unitAbbr}` : ""}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-xs text-gray-500">
-                        {(item as any).reorderLevel ?? 10}
+                        {item.reorderLevel ?? 10}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -526,7 +786,7 @@ export default function ItemsPage() {
       {/* Item Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto"
           data-ocid="items.dialog"
         >
           <DialogHeader>
@@ -534,133 +794,456 @@ export default function ItemsPage() {
               {editingItem ? "Edit Item" : "Add New Item"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>SKU *</Label>
-                <Input
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                  placeholder="SKU-001"
-                  data-ocid="items.input"
-                />
+          <Tabs defaultValue="details">
+            <TabsList className="mb-4">
+              <TabsTrigger value="details" data-ocid="items.tab">
+                Details
+              </TabsTrigger>
+              <TabsTrigger value="variants" data-ocid="items.tab">
+                Variants{variants.length > 0 ? ` (${variants.length})` : ""}
+              </TabsTrigger>
+              {editingItem && (
+                <TabsTrigger value="stock-ledger" data-ocid="items.tab">
+                  Stock Ledger
+                </TabsTrigger>
+              )}
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>SKU *</Label>
+                  <Input
+                    value={form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    placeholder="SKU-001"
+                    data-ocid="items.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Warehouse *</Label>
+                  <Select
+                    value={form.warehouseId}
+                    onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+                  >
+                    <SelectTrigger data-ocid="items.select">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Warehouse *</Label>
-                <Select
-                  value={form.warehouseId}
-                  onValueChange={(v) => setForm({ ...form, warehouseId: v })}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Item Name *</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    data-ocid="items.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={form.categoryId || "none"}
+                    onValueChange={(v) => {
+                      if (v === "none") {
+                        setForm({ ...form, categoryId: "", category: "" });
+                      } else {
+                        const cat = activeCategories.find((c) => c.id === v);
+                        setForm({
+                          ...form,
+                          categoryId: v,
+                          category: cat?.name || "",
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger data-ocid="items.select">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No Category —</SelectItem>
+                      {activeCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Brand</Label>
+                  <Select
+                    value={form.brandId || "none"}
+                    onValueChange={(v) =>
+                      setForm({ ...form, brandId: v === "none" ? "" : v })
+                    }
+                  >
+                    <SelectTrigger data-ocid="items.select">
+                      <SelectValue placeholder="Select brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No Brand —</SelectItem>
+                      {activeBrands.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Unit of Measure</Label>
+                  <Select
+                    value={form.unitId || "none"}
+                    onValueChange={(v) =>
+                      setForm({ ...form, unitId: v === "none" ? "" : v })
+                    }
+                  >
+                    <SelectTrigger data-ocid="items.select">
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No Unit —</SelectItem>
+                      {activeUnits.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name} ({u.abbreviation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Cost Price</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.costPrice}
+                    onChange={(e) =>
+                      setForm({ ...form, costPrice: e.target.value })
+                    }
+                    data-ocid="items.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sale Price</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.salePrice}
+                    onChange={(e) =>
+                      setForm({ ...form, salePrice: e.target.value })
+                    }
+                    data-ocid="items.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input
+                    type="number"
+                    value={form.quantity}
+                    onChange={(e) =>
+                      setForm({ ...form, quantity: e.target.value })
+                    }
+                    data-ocid="items.input"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Reorder Level</Label>
+                  <Input
+                    type="number"
+                    value={form.reorderLevel}
+                    onChange={(e) =>
+                      setForm({ ...form, reorderLevel: e.target.value })
+                    }
+                    min={0}
+                    data-ocid="items.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reorder Qty</Label>
+                  <Input
+                    type="number"
+                    value={form.reorderQty}
+                    onChange={(e) =>
+                      setForm({ ...form, reorderQty: e.target.value })
+                    }
+                    min={0}
+                    data-ocid="items.input"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  data-ocid="items.cancel_button"
                 >
-                  <SelectTrigger data-ocid="items.select">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} data-ocid="items.save_button">
+                  {editingItem ? "Update" : "Add"} Item
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="variants" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Define variants like Size, Color, Weight for this item.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setVariantForm(EMPTY_VARIANT);
+                    setEditingVariantIdx(null);
+                    setShowVariantForm(true);
+                  }}
+                  data-ocid="items.secondary_button"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Variant
+                </Button>
+              </div>
+
+              {showVariantForm && (
+                <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                  <p className="font-medium text-sm">
+                    {editingVariantIdx !== null
+                      ? "Edit Variant"
+                      : "New Variant"}
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Type *</Label>
+                      <Input
+                        value={variantForm.variantType}
+                        onChange={(e) =>
+                          setVariantForm({
+                            ...variantForm,
+                            variantType: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Size, Color"
+                        data-ocid="items.input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Value *</Label>
+                      <Input
+                        value={variantForm.variantValue}
+                        onChange={(e) =>
+                          setVariantForm({
+                            ...variantForm,
+                            variantValue: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Large, Red"
+                        data-ocid="items.input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">SKU Suffix</Label>
+                      <Input
+                        value={variantForm.skuSuffix}
+                        onChange={(e) =>
+                          setVariantForm({
+                            ...variantForm,
+                            skuSuffix: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. -L"
+                        data-ocid="items.input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Price Adj (+/-)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={variantForm.priceAdjustment}
+                        onChange={(e) =>
+                          setVariantForm({
+                            ...variantForm,
+                            priceAdjustment:
+                              Number.parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        data-ocid="items.input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Stock Qty</Label>
+                      <Input
+                        type="number"
+                        value={variantForm.quantity}
+                        onChange={(e) =>
+                          setVariantForm({
+                            ...variantForm,
+                            quantity: Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                        data-ocid="items.input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Status</Label>
+                      <Select
+                        value={variantForm.status}
+                        onValueChange={(v) =>
+                          setVariantForm({
+                            ...variantForm,
+                            status: v as "active" | "inactive",
+                          })
+                        }
+                      >
+                        <SelectTrigger data-ocid="items.select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setShowVariantForm(false);
+                        setEditingVariantIdx(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleAddVariant}
+                      data-ocid="items.save_button"
+                    >
+                      {editingVariantIdx !== null ? "Update" : "Add"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {variants.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                  No variants yet. Click &quot;Add Variant&quot; to create one.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>SKU Suffix</TableHead>
+                      <TableHead className="text-right">Price Adj</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {variants.map((v, i) => (
+                      <TableRow key={v.id} data-ocid={`items.item.${i + 1}`}>
+                        <TableCell className="font-medium">
+                          {v.variantType}
+                        </TableCell>
+                        <TableCell>{v.variantValue}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {v.skuSuffix || "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={
+                              v.priceAdjustment >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }
+                          >
+                            {v.priceAdjustment >= 0 ? "+" : ""}
+                            {v.priceAdjustment}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {v.quantity}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              v.status === "active" ? "default" : "secondary"
+                            }
+                            className={
+                              v.status === "active"
+                                ? "bg-green-100 text-green-800 hover:bg-green-100"
+                                : ""
+                            }
+                          >
+                            {v.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditVariant(i)}
+                              data-ocid={`items.edit_button.${i + 1}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteVariant(i)}
+                              className="text-red-600 hover:bg-red-50"
+                              data-ocid={`items.delete_button.${i + 1}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </TableBody>
+                </Table>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  data-ocid="items.cancel_button"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} data-ocid="items.save_button">
+                  {editingItem ? "Update" : "Add"} Item
+                </Button>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Item Name *</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  data-ocid="items.input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Input
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value })
-                  }
-                  placeholder="e.g. Electronics"
-                  data-ocid="items.input"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Cost Price</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.costPrice}
-                  onChange={(e) =>
-                    setForm({ ...form, costPrice: e.target.value })
-                  }
-                  data-ocid="items.input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Sale Price</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.salePrice}
-                  onChange={(e) =>
-                    setForm({ ...form, salePrice: e.target.value })
-                  }
-                  data-ocid="items.input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Quantity</Label>
-                <Input
-                  type="number"
-                  value={form.quantity}
-                  onChange={(e) =>
-                    setForm({ ...form, quantity: e.target.value })
-                  }
-                  data-ocid="items.input"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Reorder Level</Label>
-                <Input
-                  type="number"
-                  value={form.reorderLevel}
-                  onChange={(e) =>
-                    setForm({ ...form, reorderLevel: e.target.value })
-                  }
-                  min={0}
-                  data-ocid="items.input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reorder Qty</Label>
-                <Input
-                  type="number"
-                  value={form.reorderQty}
-                  onChange={(e) =>
-                    setForm({ ...form, reorderQty: e.target.value })
-                  }
-                  min={0}
-                  data-ocid="items.input"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-                data-ocid="items.cancel_button"
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSave} data-ocid="items.save_button">
-                {editingItem ? "Update" : "Add"} Item
-              </Button>
-            </div>
-          </div>
+            </TabsContent>
+
+            {editingItem && (
+              <TabsContent value="stock-ledger" className="space-y-4">
+                <StockLedgerTab itemId={editingItem.id} />
+              </TabsContent>
+            )}
+          </Tabs>
         </DialogContent>
       </Dialog>
 

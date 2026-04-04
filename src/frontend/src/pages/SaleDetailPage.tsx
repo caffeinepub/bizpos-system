@@ -87,8 +87,16 @@ export default function SaleDetailPage() {
                   <p className="font-semibold">{sale.warehouseName}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-500">Shop</p>
+                  <p className="font-semibold">{sale.shopName || "—"}</p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-500">Sale Type</p>
                   <Badge variant="outline">{sale.saleType}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Payment Method</p>
+                  <p className="font-semibold">{sale.paymentMethod || "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Company</p>
@@ -124,17 +132,48 @@ export default function SaleDetailPage() {
               </Table>
 
               <div className="mt-4 flex justify-end">
-                <div className="w-64 space-y-2 text-sm">
+                <div className="w-72 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal:</span>
                     <span>{sale.subtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Discount:</span>
-                    <span className="text-red-600">
-                      -{sale.discount.toLocaleString()}
-                    </span>
-                  </div>
+                  {sale.discount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Discount:</span>
+                      <span className="text-red-600">
+                        -{sale.discount.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {(sale.promoSavings ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Promo Savings:</span>
+                      <span className="text-orange-600">
+                        -{(sale.promoSavings ?? 0).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {(sale.discount > 0 || (sale.promoSavings ?? 0) > 0) && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Taxable Amount:</span>
+                      <span>
+                        {Math.max(
+                          0,
+                          sale.subtotal -
+                            sale.discount -
+                            (sale.promoSavings ?? 0),
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {(sale.taxAmount ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tax:</span>
+                      <span className="text-blue-600">
+                        +{(sale.taxAmount ?? 0).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-lg border-t pt-2">
                     <span>Total:</span>
                     <span className="text-primary">

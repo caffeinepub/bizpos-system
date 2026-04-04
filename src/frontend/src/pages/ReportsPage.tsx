@@ -57,16 +57,38 @@ function fmt(n: number) {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 0 });
 }
 
+function getActiveCompanyName(): string {
+  try {
+    const session = JSON.parse(localStorage.getItem("bizpos_session") || "{}");
+    if (session?.activeCompanyId) {
+      const companies = JSON.parse(
+        localStorage.getItem("bizpos_companies") || "[]",
+      );
+      const co = companies.find(
+        (c: { id: string; name: string }) => c.id === session.activeCompanyId,
+      );
+      if (co?.name) return co.name;
+    }
+    const settings = JSON.parse(
+      localStorage.getItem("bizpos_settings") || "{}",
+    );
+    return settings?.companyName || "BizPOS";
+  } catch {
+    return "BizPOS";
+  }
+}
+
 function exportExcel(
   headers: string[],
   rows: (string | number)[][],
   filename: string,
+  companyName: string,
   title?: string,
   generatedBy?: string,
   filters?: { label: string; value: string }[],
 ) {
   exportExcelUtil(filename, "Report", headers, rows, {
-    companyName: "BizPOS System",
+    companyName,
     reportTitle: title ?? filename.replace(/\.xlsx$/, "").replace(/-/g, " "),
     generatedBy: generatedBy ?? "Unknown",
     filters,
@@ -78,11 +100,12 @@ function exportPDF(
   headers: string[],
   rows: (string | number)[][],
   filename: string,
+  companyName: string,
   generatedBy?: string,
   filters?: { label: string; value: string }[],
 ) {
   exportPDFUtil(title, headers, rows, filename, {
-    companyName: "BizPOS System",
+    companyName,
     generatedBy: generatedBy ?? "Unknown",
     filters,
   });
@@ -102,6 +125,7 @@ function ExportBar({
   headers,
   rows,
   filename,
+  companyName,
   generatedBy,
   filters,
 }: {
@@ -109,6 +133,7 @@ function ExportBar({
   headers: string[];
   rows: (string | number)[][];
   filename: string;
+  companyName: string;
   generatedBy?: string;
   filters?: { label: string; value: string }[];
 }) {
@@ -122,6 +147,7 @@ function ExportBar({
             headers,
             rows,
             `${filename}.xlsx`,
+            companyName,
             title,
             generatedBy,
             filters,
@@ -141,6 +167,7 @@ function ExportBar({
             headers,
             rows,
             `${filename}.pdf`,
+            companyName,
             generatedBy,
             filters,
           )
@@ -858,6 +885,7 @@ export default function ReportsPage() {
                         s.status,
                       ])}
                       filename="sales_list"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -945,6 +973,7 @@ export default function ReportsPage() {
                         r.avg,
                       ])}
                       filename="sales_by_customer"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1003,6 +1032,7 @@ export default function ReportsPage() {
                           : "-",
                       ])}
                       filename="sales_by_product"
+                      companyName={getActiveCompanyName()}
                     />
                   </CardHeader>
                   <CardContent>
@@ -1059,6 +1089,7 @@ export default function ReportsPage() {
                         r.revenue,
                       ])}
                       filename="sales_by_warehouse"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1102,6 +1133,7 @@ export default function ReportsPage() {
                         r.total,
                       ])}
                       filename="sales_by_payment"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1258,6 +1290,7 @@ export default function ReportsPage() {
                         p.status,
                       ])}
                       filename="purchases_list"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1336,6 +1369,7 @@ export default function ReportsPage() {
                         r.last,
                       ])}
                       filename="purchases_by_supplier"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1383,6 +1417,7 @@ export default function ReportsPage() {
                       headers={["Item", "Qty Purchased", "Total Cost"]}
                       rows={purchasesByItem.map((r) => [r.name, r.qty, r.cost])}
                       filename="purchases_by_item"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1529,6 +1564,7 @@ export default function ReportsPage() {
                         i.value,
                       ])}
                       filename="stock_summary"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1593,6 +1629,7 @@ export default function ReportsPage() {
                         i.quantity,
                       ])}
                       filename="low_stock"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1658,6 +1695,7 @@ export default function ReportsPage() {
                         r.value,
                       ])}
                       filename="stock_by_warehouse"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1834,6 +1872,7 @@ export default function ReportsPage() {
                         r.net,
                       ])}
                       filename="salary_register"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -1925,6 +1964,7 @@ export default function ReportsPage() {
                         r.total,
                       ])}
                       filename="deductions_report"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2070,6 +2110,7 @@ export default function ReportsPage() {
                         r.credit || "",
                       ])}
                       filename="trial_balance"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2154,6 +2195,7 @@ export default function ReportsPage() {
                           e.balance,
                         ])}
                         filename="general_ledger"
+                        companyName={getActiveCompanyName()}
                         generatedBy={currentUser?.name ?? "Unknown"}
                       />
                     )}
@@ -2248,6 +2290,7 @@ export default function ReportsPage() {
                         ],
                       ]}
                       filename="profit_loss"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2313,6 +2356,7 @@ export default function ReportsPage() {
                           )
                           .map((a) => [a.name, a.currentBalance])}
                         filename="balance_sheet_assets"
+                        companyName={getActiveCompanyName()}
                         generatedBy={currentUser?.name ?? "Unknown"}
                       />
                     </CardHeader>
@@ -2358,6 +2402,7 @@ export default function ReportsPage() {
                           )
                           .map((a) => [a.name, a.type, a.currentBalance])}
                         filename="balance_sheet_liabilities"
+                        companyName={getActiveCompanyName()}
                         generatedBy={currentUser?.name ?? "Unknown"}
                       />
                     </CardHeader>
@@ -2499,6 +2544,7 @@ export default function ReportsPage() {
                         ]),
                       )}
                       filename="leave_by_employee"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2562,6 +2608,7 @@ export default function ReportsPage() {
                         r.pending,
                       ])}
                       filename="leave_utilization"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2650,6 +2697,7 @@ export default function ReportsPage() {
                         r.reason,
                       ])}
                       filename="leave_requests"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2791,6 +2839,7 @@ export default function ReportsPage() {
                       headers={["Module", "Count"]}
                       rows={moduleActivity.map((r) => [r.module, r.count])}
                       filename="module_activity"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -2895,6 +2944,7 @@ export default function ReportsPage() {
                         l.details,
                       ])}
                       filename="activity_logs"
+                      companyName={getActiveCompanyName()}
                       generatedBy={currentUser?.name ?? "Unknown"}
                     />
                   </CardHeader>
@@ -3206,6 +3256,7 @@ function WarehouseStockReport({
           headers={hdrs}
           rows={exportRows}
           filename="warehouse_stock"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -3340,6 +3391,7 @@ function TransfersReport({
           headers={hdrs}
           rows={exportRows}
           filename="inventory_transfers"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -3474,6 +3526,7 @@ function ChequeStatusReport({
           headers={hdrs}
           rows={exportRows}
           filename="cheque_status"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -3585,6 +3638,7 @@ function BankAccountsReport({
           headers={hdrs}
           rows={exportRows}
           filename="bank_accounts_report"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -3703,6 +3757,7 @@ function ReconciliationReport({
           headers={hdrs}
           rows={exportRows}
           filename="bank_reconciliation_report"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -3862,6 +3917,7 @@ function TaxCollectionReport({
           headers={hdrs}
           rows={exportRows}
           filename="tax_collection"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
           filters={[
             { label: "Date From", value: dateFrom || "All" },
@@ -3984,6 +4040,7 @@ function SupplierAgingReport({
           headers={hdrs}
           rows={exportRows}
           filename="supplier_aging"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -4086,6 +4143,7 @@ function CustomerAgingReport({
           headers={hdrs}
           rows={exportRows}
           filename="customer_aging"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -4244,6 +4302,7 @@ function ShiftClosingReport({
           headers={hdrs}
           rows={exportRows}
           filename="shift_closings"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>
@@ -4385,6 +4444,7 @@ function AttendanceSummaryReport({
           headers={hdrs}
           rows={exportRows}
           filename="attendance_summary"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
           filters={[{ label: "Month", value: monthF }]}
         />
@@ -4530,6 +4590,7 @@ function LeaveBalanceReport({
           headers={hdrs}
           rows={exportRows}
           filename="leave_balance"
+          companyName={getActiveCompanyName()}
           generatedBy={currentUser?.name ?? "Unknown"}
         />
       </CardHeader>

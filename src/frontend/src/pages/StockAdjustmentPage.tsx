@@ -26,7 +26,7 @@ interface AdjustmentLog {
 }
 
 export default function StockAdjustmentPage() {
-  const { items, warehouses, adjustStock } = useStore();
+  const { items, warehouses, adjustStock, addStockMovement } = useStore();
   const [warehouseId, setWarehouseId] = useState("all");
   const [itemId, setItemId] = useState("");
   const [adjustType, setAdjustType] = useState<"Add" | "Remove">("Add");
@@ -60,7 +60,24 @@ export default function StockAdjustmentPage() {
       );
       return;
     }
-    adjustStock(itemId, adjustType === "Add" ? qty : -qty);
+    const adjustmentQty = adjustType === "Add" ? qty : -qty;
+    adjustStock(itemId, adjustmentQty);
+    const warehouseName =
+      warehouses.find((w) => w.id === selectedItem?.warehouseId)?.name || "";
+    const newQty = selectedItem
+      ? Math.max(0, selectedItem.quantity + adjustmentQty)
+      : 0;
+    addStockMovement({
+      itemId,
+      itemName: selectedItem?.name || "",
+      type: "Adjustment",
+      reference: `ADJ-${Date.now()}`,
+      quantityChange: adjustmentQty,
+      quantityAfter: newQty,
+      warehouseId: selectedItem?.warehouseId || "",
+      warehouseName,
+      notes: reason || "Manual adjustment",
+    });
     setLogs((prev) => [
       {
         id: Date.now().toString(),

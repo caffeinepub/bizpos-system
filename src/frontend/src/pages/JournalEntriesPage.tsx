@@ -142,8 +142,18 @@ export default function JournalEntriesPage() {
       toast.error("Date and description required");
       return;
     }
-    if (!isBalanced) {
-      toast.error("Debit and credit must be equal");
+    const totalDebits = form.lines.reduce(
+      (s, l) => s + (Number.parseFloat(l.debit) || 0),
+      0,
+    );
+    const totalCredits = form.lines.reduce(
+      (s, l) => s + (Number.parseFloat(l.credit) || 0),
+      0,
+    );
+    if (Math.abs(totalDebits - totalCredits) > 0.01) {
+      toast.error(
+        `Journal entry is not balanced. Debits: ${totalDebits.toFixed(2)}, Credits: ${totalCredits.toFixed(2)}`,
+      );
       return;
     }
     const lines: JournalLine[] = form.lines

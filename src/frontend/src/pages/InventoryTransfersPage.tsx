@@ -58,6 +58,7 @@ const EMPTY_FORM: FormData = {
 
 export default function InventoryTransfersPage() {
   const store = useStore();
+  const { addStockMovement } = store;
   const transfers = store.inventoryTransfers;
   const warehouses = store.warehouses;
 
@@ -386,11 +387,36 @@ export default function InventoryTransfersPage() {
                             size="sm"
                             variant="ghost"
                             className="text-green-600"
-                            onClick={() =>
+                            onClick={() => {
                               store.updateInventoryTransfer(t.id, {
                                 status: "Completed",
-                              })
-                            }
+                              });
+                              // Record stock movements for each transferred item
+                              for (const tItem of t.items) {
+                                addStockMovement({
+                                  itemId: tItem.productId || "",
+                                  itemName: tItem.productName,
+                                  type: "Transfer-Out",
+                                  reference: t.transferNo,
+                                  quantityChange: -tItem.qty,
+                                  quantityAfter: 0,
+                                  warehouseId: t.fromWarehouseId,
+                                  warehouseName: t.fromWarehouseName,
+                                  notes: `Transfer to ${t.toWarehouseName}`,
+                                });
+                                addStockMovement({
+                                  itemId: tItem.productId || "",
+                                  itemName: tItem.productName,
+                                  type: "Transfer-In",
+                                  reference: t.transferNo,
+                                  quantityChange: tItem.qty,
+                                  quantityAfter: 0,
+                                  warehouseId: t.toWarehouseId,
+                                  warehouseName: t.toWarehouseName,
+                                  notes: `Transfer from ${t.fromWarehouseName}`,
+                                });
+                              }
+                            }}
                           >
                             Complete
                           </Button>

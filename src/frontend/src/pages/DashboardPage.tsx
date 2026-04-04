@@ -103,24 +103,23 @@ export default function DashboardPage() {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 5);
 
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const chartData = days.map((day, i) => {
-    const saleAmt =
-      filteredSales.length > 0
-        ? (filteredSales.reduce((sum, s) => sum + s.total, 0) / 7) *
-          (0.8 + 0.4 * Math.sin(i))
-        : 0;
-    const purAmt =
-      filteredPurchases.length > 0
-        ? (filteredPurchases.reduce((sum, p) => sum + p.total, 0) / 7) *
-          (0.7 + 0.3 * Math.cos(i))
-        : 0;
-    return {
-      name: day,
-      sales: Math.round(saleAmt),
-      purchases: Math.round(purAmt),
-    };
-  });
+  const chartData = useMemo(() => {
+    const result: { name: string; sales: number; purchases: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+      const daySales = filteredSales
+        .filter((s) => s.saleDate === dateStr)
+        .reduce((sum, s) => sum + s.total, 0);
+      const dayPurchases = filteredPurchases
+        .filter((p) => p.purchaseDate === dateStr)
+        .reduce((sum, p) => sum + p.total, 0);
+      result.push({ name: dayLabel, sales: daySales, purchases: dayPurchases });
+    }
+    return result;
+  }, [filteredSales, filteredPurchases]);
 
   const activeCompany = currentUser?.activeCompanyId
     ? companies.find((c) => c.id === currentUser.activeCompanyId)
