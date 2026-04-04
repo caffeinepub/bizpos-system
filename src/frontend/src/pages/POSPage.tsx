@@ -40,6 +40,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useStore } from "../store/useStore";
+import type { Item } from "../store/useStore";
 
 interface CartItem {
   itemId: string;
@@ -94,6 +95,38 @@ function saveHeldSales(shopId: string, userId: string, held: HeldSale[]) {
   } catch {
     /* ignore */
   }
+}
+
+// Reusable item card used in the POS item grid
+function ItemCard({
+  item,
+  onAdd,
+  currency,
+}: {
+  item: Item;
+  onAdd: (item: Item) => void;
+  currency: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd(item)}
+      className="p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      disabled={item.quantity === 0}
+      data-ocid="pos.primary_button"
+    >
+      <div className="font-medium text-sm leading-tight">{item.name}</div>
+      <div className="text-xs text-gray-400 mt-0.5">{item.sku}</div>
+      <div className="text-primary font-bold mt-1 text-sm">
+        {formatCurrency(item.salePrice, currency)}
+      </div>
+      <div
+        className={`text-xs mt-0.5 ${item.quantity === 0 ? "text-red-500" : "text-gray-400"}`}
+      >
+        Stock: {item.quantity === 0 ? "Out of stock" : item.quantity}
+      </div>
+    </button>
+  );
 }
 
 export default function POSPage() {
@@ -896,40 +929,94 @@ export default function POSPage() {
                 })}
               </div>
 
-              {/* Item grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto">
-                {filteredItems.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    onClick={() => addToCart(item)}
-                    className="p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={item.quantity === 0}
-                    data-ocid="pos.primary_button"
-                  >
-                    <div className="font-medium text-sm leading-tight">
-                      {item.name}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {item.sku}
-                    </div>
-                    <div className="text-primary font-bold mt-1 text-sm">
-                      {formatCurrency(item.salePrice, prefs.currency)}
-                    </div>
-                    <div
-                      className={`text-xs mt-0.5 ${
-                        item.quantity === 0 ? "text-red-500" : "text-gray-400"
-                      }`}
-                    >
-                      Stock:{" "}
-                      {item.quantity === 0 ? "Out of stock" : item.quantity}
-                    </div>
-                  </button>
-                ))}
-                {filteredItems.length === 0 && (
-                  <p className="col-span-3 text-center text-muted-foreground py-8 text-sm">
+              {/* Item grid — grouped by category when "All" is selected */}
+              <div className="max-h-80 overflow-y-auto space-y-4">
+                {filteredItems.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8 text-sm">
                     No items found
                   </p>
+                ) : selectedCategory !== "all" ? (
+                  // Single category selected — flat grid, no header needed (tab already shows category)
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {filteredItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onAdd={addToCart}
+                        currency={prefs.currency}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  // "All" selected — group by category, ordered by seqNo
+                  (() => {
+                    // Build ordered category groups
+                    const categoriesWithItems = sortedCategories.filter((cat) =>
+                      filteredItems.some((i) => i.categoryId === cat.id),
+                    );
+                    const uncategorisedItems = filteredItems.filter(
+                      (i) =>
+                        !i.categoryId ||
+                        !itemCategories.find((c) => c.id === i.categoryId),
+                    );
+                    return (
+                      <>
+                        {categoriesWithItems.map((cat) => {
+                          const catItems = filteredItems.filter(
+                            (i) => i.categoryId === cat.id,
+                          );
+                          return (
+                            <div key={cat.id}>
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full uppercase tracking-wide">
+                                  {cat.name}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {catItems.length} item
+                                  {catItems.length !== 1 ? "s" : ""}
+                                </span>
+                                <div className="flex-1 h-px bg-blue-100" />
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {catItems.map((item) => (
+                                  <ItemCard
+                                    key={item.id}
+                                    item={item}
+                                    onAdd={addToCart}
+                                    currency={prefs.currency}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {uncategorisedItems.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full uppercase tracking-wide">
+                                Uncategorised
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {uncategorisedItems.length} item
+                                {uncategorisedItems.length !== 1 ? "s" : ""}
+                              </span>
+                              <div className="flex-1 h-px bg-gray-200" />
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {uncategorisedItems.map((item) => (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  onAdd={addToCart}
+                                  currency={prefs.currency}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 )}
               </div>
             </CardContent>
