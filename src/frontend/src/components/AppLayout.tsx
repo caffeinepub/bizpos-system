@@ -34,6 +34,7 @@ import {
   FileText,
   Gift,
   History,
+  Keyboard,
   Landmark,
   LayoutDashboard,
   LifeBuoy,
@@ -344,6 +345,26 @@ const navGroups: NavGroup[] = [
       { path: "/settings", label: "Settings", icon: Settings },
     ],
   },
+];
+
+const KEYBOARD_SHORTCUTS = [
+  { keys: "G → D", description: "Dashboard", path: "/dashboard" },
+  { keys: "G → P", description: "Point of Sale", path: "/pos" },
+  { keys: "G → S", description: "Sales", path: "/sales" },
+  { keys: "G → I", description: "Items / Inventory", path: "/items" },
+  { keys: "G → U", description: "Users", path: "/users" },
+  { keys: "G → R", description: "Reports", path: "/reports" },
+  {
+    keys: "G → A",
+    description: "Chart of Accounts",
+    path: "/chart-of-accounts",
+  },
+  { keys: "G → E", description: "Employees", path: "/employees" },
+  { keys: "G → B", description: "Banks", path: "/banks" },
+  { keys: "G → T", description: "Tickets", path: "/tickets" },
+  { keys: "G → O", description: "Purchase Orders", path: "/purchase-orders" },
+  { keys: "G → C", description: "Customers", path: "/customers" },
+  { keys: "?", description: "Toggle this shortcuts panel", path: "" },
 ];
 
 function getLabelForPath(path: string): string {
@@ -783,6 +804,187 @@ function NotificationBell() {
   );
 }
 
+function KeyboardShortcuts({
+  navigateTo,
+}: {
+  navigateTo: (path: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const waitingRef = useRef(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      // Skip if focused on interactive inputs
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.getAttribute("contenteditable") === "true"
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // Toggle cheatsheet on ?
+      if (e.key === "?") {
+        e.preventDefault();
+        setOpen((prev) => !prev);
+        waitingRef.current = false;
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+        return;
+      }
+
+      // Close modal on Escape
+      if (e.key === "Escape") {
+        setOpen(false);
+        waitingRef.current = false;
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+        return;
+      }
+
+      if (waitingRef.current) {
+        // Second key in G + key sequence
+        waitingRef.current = false;
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+
+        const shortcutMap: Record<string, string> = {
+          d: "/dashboard",
+          p: "/pos",
+          s: "/sales",
+          i: "/items",
+          u: "/users",
+          r: "/reports",
+          a: "/chart-of-accounts",
+          e: "/employees",
+          b: "/banks",
+          t: "/tickets",
+          o: "/purchase-orders",
+          c: "/customers",
+        };
+
+        const dest = shortcutMap[key];
+        if (dest) {
+          e.preventDefault();
+          navigateTo(dest);
+        }
+      } else if (key === "g") {
+        // First key: G — start waiting for second key
+        e.preventDefault();
+        waitingRef.current = true;
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = setTimeout(() => {
+          waitingRef.current = false;
+        }, 1500);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, [navigateTo]);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        title="Keyboard Shortcuts (?)"
+        onClick={() => setOpen((prev) => !prev)}
+        data-ocid="nav.keyboard_shortcuts.button"
+      >
+        <Keyboard className="h-5 w-5" />
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+          tabIndex={-1}
+          data-ocid="nav.keyboard_shortcuts.modal"
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Keyboard className="h-4 w-4 text-blue-600" />
+                </div>
+                <h2 className="font-semibold text-slate-900 text-base">
+                  Keyboard Shortcuts
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                data-ocid="nav.keyboard_shortcuts.close_button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left">
+                    <th className="pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">
+                      Shortcut
+                    </th>
+                    <th className="pb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {KEYBOARD_SHORTCUTS.map((sc) => (
+                    <tr key={sc.keys} className="hover:bg-slate-50">
+                      <td className="py-2 pr-4">
+                        <kbd className="inline-flex items-center gap-1 font-mono text-xs bg-slate-100 border border-slate-300 text-slate-700 rounded px-2 py-1 shadow-sm">
+                          {sc.keys}
+                        </kbd>
+                      </td>
+                      <td className="py-2 text-slate-700">{sc.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 rounded-b-xl">
+              <p className="text-xs text-slate-500 text-center">
+                Press{" "}
+                <kbd className="font-mono bg-white border border-slate-300 rounded px-1 text-slate-700">
+                  G
+                </kbd>{" "}
+                then a letter to navigate. Press{" "}
+                <kbd className="font-mono bg-white border border-slate-300 rounded px-1 text-slate-700">
+                  ?
+                </kbd>{" "}
+                to toggle this panel.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function AccessGuard() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -901,6 +1103,22 @@ export default function AppLayout() {
     ? visibleGroups.find((g) => g.key === flyout.key)
     : null;
 
+  // Resolve active company name from localStorage
+  const activeCompanyName = (() => {
+    if (!currentUser?.activeCompanyId) return null;
+    try {
+      const companies = JSON.parse(
+        localStorage.getItem("bizpos_companies") || "[]",
+      );
+      const c = companies.find(
+        (x: { id: string }) => x.id === currentUser.activeCompanyId,
+      );
+      return c ? (c.name as string) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const SidebarItem = ({ group }: { group: NavGroup }) => {
     const Icon = group.icon;
     const active = isGroupActive(group);
@@ -986,72 +1204,8 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* User info */}
+        {/* Sidebar bottom — minimal logout only (user info moved to topbar) */}
         <div className="border-t border-slate-700 p-2">
-          {!collapsed && (
-            <div className="px-2 py-1 mb-1">
-              {!currentUser?.isSuperUser && currentUser?.activeCompanyId && (
-                <p className="text-blue-300 text-[10px] font-medium truncate mb-0.5">
-                  {(() => {
-                    try {
-                      const c = JSON.parse(
-                        localStorage.getItem("bizpos_companies") || "[]",
-                      ).find(
-                        (x: { id: string }) =>
-                          x.id === currentUser.activeCompanyId,
-                      );
-                      return c ? c.name : "";
-                    } catch {
-                      return "";
-                    }
-                  })()}
-                </p>
-              )}
-              {currentUser?.isSuperUser && currentUser?.activeCompanyId && (
-                <button
-                  type="button"
-                  onClick={() => navigate({ to: "/company-select" })}
-                  className="text-blue-300 text-[10px] font-medium truncate mb-0.5 hover:text-blue-200 flex items-center gap-1 w-full text-left"
-                >
-                  <Building2 className="h-3 w-3 flex-shrink-0" />
-                  {(() => {
-                    try {
-                      const c = JSON.parse(
-                        localStorage.getItem("bizpos_companies") || "[]",
-                      ).find(
-                        (x: { id: string }) =>
-                          x.id === currentUser.activeCompanyId,
-                      );
-                      return c ? c.name : "Switch Company";
-                    } catch {
-                      return "Switch Company";
-                    }
-                  })()}
-                </button>
-              )}
-              {currentUser?.isSuperUser && !currentUser?.activeCompanyId && (
-                <button
-                  type="button"
-                  onClick={() => navigate({ to: "/company-select" })}
-                  className="text-blue-300 text-[10px] font-medium mb-0.5 hover:text-blue-200 flex items-center gap-1 w-full text-left"
-                >
-                  <Building2 className="h-3 w-3 flex-shrink-0" />
-                  Select Company
-                </button>
-              )}
-              <p className="text-white text-xs font-medium truncate">
-                {currentUser?.name}
-              </p>
-              <p className="text-slate-400 text-xs truncate">
-                {currentUser?.roleName}
-                {currentUser?.isSuperUser && (
-                  <Badge className="ml-1 text-[10px] px-1 py-0 bg-purple-600 text-white border-0 align-middle">
-                    Super
-                  </Badge>
-                )}
-              </p>
-            </div>
-          )}
           <button
             type="button"
             onClick={() => {
@@ -1059,6 +1213,7 @@ export default function AppLayout() {
               navigate({ to: "/" });
             }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+            title="Logout"
             data-ocid="nav.logout.button"
           >
             <LogOut className="h-4 w-4 flex-shrink-0" />
@@ -1235,17 +1390,98 @@ export default function AppLayout() {
             currentUser={currentUser}
           />
           <NotificationBell />
+          <KeyboardShortcuts navigateTo={navigateTo} />
         </div>
+
         {/* Desktop topbar */}
-        <div className="hidden md:flex items-center justify-end gap-1 px-4 py-2 bg-white border-b border-slate-100">
-          <FavoritesButton navigateTo={navigateTo} currentUser={currentUser} />
-          <BookmarkButton
-            currentPath={currentPath}
-            navigateTo={navigateTo}
-            currentUser={currentUser}
-          />
-          <NotificationBell />
+        <div className="hidden md:flex items-center justify-between gap-1 px-4 py-2 bg-white border-b border-slate-100">
+          {/* Left side — subtle app identity */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium select-none">
+              BizPOS
+            </span>
+          </div>
+
+          {/* Right side — tools + user info */}
+          <div className="flex items-center gap-1">
+            <FavoritesButton
+              navigateTo={navigateTo}
+              currentUser={currentUser}
+            />
+            <BookmarkButton
+              currentPath={currentPath}
+              navigateTo={navigateTo}
+              currentUser={currentUser}
+            />
+            <NotificationBell />
+            <KeyboardShortcuts navigateTo={navigateTo} />
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-slate-200 mx-1" />
+
+            {/* Company name */}
+            {currentUser?.activeCompanyId &&
+              (currentUser?.isSuperUser ? (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: "/company-select" })}
+                  title="Switch Company"
+                  className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors"
+                  data-ocid="nav.company.button"
+                >
+                  <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="max-w-[120px] truncate">
+                    {activeCompanyName ?? "Switch Company"}
+                  </span>
+                </button>
+              ) : (
+                <span
+                  className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-medium"
+                  data-ocid="nav.company.panel"
+                >
+                  <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="max-w-[120px] truncate">
+                    {activeCompanyName ?? ""}
+                  </span>
+                </span>
+              ))}
+
+            {/* User name + role */}
+            <div
+              className="flex flex-col items-end leading-none gap-0.5 px-2"
+              data-ocid="nav.user.panel"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  {currentUser?.name}
+                </span>
+                {currentUser?.isSuperUser && (
+                  <Badge className="text-[10px] px-1 py-0 bg-purple-600 text-white border-0">
+                    Super
+                  </Badge>
+                )}
+              </div>
+              <span className="text-xs text-slate-400">
+                {currentUser?.roleName}
+              </span>
+            </div>
+
+            {/* Logout button */}
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate({ to: "/" });
+              }}
+              title="Logout"
+              className="p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              data-ocid="nav.topbar.logout.button"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+
         <main className="flex-1 overflow-y-auto">
           <AccessGuard />
         </main>
