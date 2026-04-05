@@ -12,7 +12,7 @@ import {
   Search,
   Server,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 interface CodeBlock {
   lang: string;
@@ -1064,24 +1064,19 @@ export default function BackendManualPage() {
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
+      const isExpanding = !next.has(id);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      if (isExpanding) {
+        requestAnimationFrame(() => {
+          document
+            .getElementById(id)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
       return next;
     });
   };
-
-  const navigateToSection = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    requestAnimationFrame(() => {
-      document
-        .getElementById(id)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, []);
 
   const handleCopy = (code: string, key: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -1209,7 +1204,7 @@ export default function BackendManualPage() {
               <button
                 type="button"
                 key={s.id}
-                onClick={() => navigateToSection(s.id)}
+                onClick={() => toggle(s.id)}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors mb-0.5 ${
                   expanded.has(s.id)
                     ? "bg-blue-50 text-blue-700 font-medium"

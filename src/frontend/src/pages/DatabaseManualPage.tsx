@@ -7,7 +7,7 @@ import {
   Download,
   Search,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 interface TableDef {
   name: string;
@@ -1156,24 +1156,19 @@ export default function DatabaseManualPage() {
   const toggleGroup = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
+      const isExpanding = !next.has(id);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      if (isExpanding) {
+        requestAnimationFrame(() => {
+          document
+            .getElementById(id)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
       return next;
     });
   };
-
-  const navigateToGroup = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    requestAnimationFrame(() => {
-      document
-        .getElementById(id)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, []);
 
   const toggleTable = (name: string) => {
     setExpandedTables((prev) => {
@@ -1324,7 +1319,7 @@ export default function DatabaseManualPage() {
             <button
               type="button"
               key={g.id}
-              onClick={() => navigateToGroup(g.id)}
+              onClick={() => toggleGroup(g.id)}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors mb-0.5 ${
                 expanded.has(g.id)
                   ? "bg-blue-50 text-blue-700 font-medium"
