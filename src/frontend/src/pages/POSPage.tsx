@@ -758,7 +758,10 @@ export default function POSPage() {
                   <span className="font-medium">{lastSale.paymentMethod}</span>
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
+              <div
+                className="flex gap-2 pt-2 receipt-actions"
+                data-print="hide"
+              >
                 <Button
                   variant="outline"
                   onClick={() => window.print()}

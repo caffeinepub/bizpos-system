@@ -94,3 +94,118 @@ body[data-compact="true"] table tbody tr th {
 body[data-tooltips="false"] [title] {
   pointer-events: auto;
 }
+
+/* ============================================================
+   PRINT STYLES — applied system-wide when printing
+   Hides all navigation, buttons, and UI chrome.
+   Only the printable content region is shown.
+   ============================================================ */
+@media print {
+  /* Hide all navigation, sidebar, top bar, and UI chrome */
+  nav,
+  aside,
+  header,
+  footer,
+  [data-slot="sidebar"],
+  [data-slot="sidebar-rail"],
+  [data-sidebar="sidebar"],
+  .sidebar,
+  #sidebar,
+  [class*="sidebar"],
+  [role="navigation"],
+  [role="banner"],
+  [role="complementary"] {
+    display: none !important;
+  }
+
+  /* Hide all buttons globally */
+  button,
+  [role="button"],
+  .btn,
+  a[href]:not(.print-show) {
+    display: none !important;
+  }
+
+  /* Hide action bars, filter bars, toolbars, tabs */
+  [data-slot="dialog-close"],
+  [data-slot="sheet-close"],
+  [class*="no-print"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* For modal/dialog print — show only the inner content */
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"] {
+    display: none !important;
+  }
+
+  /* When printing from inside a dialog/sheet, make the content
+     expand to full page and remove modal chrome */
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"] {
+    position: static !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* Reset body/page for printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+  }
+
+  /* Ensure tables print cleanly */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #ccc !important;
+    padding: 4pt 6pt !important;
+  }
+
+  /* Page breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+  .page-break-after {
+    page-break-after: always;
+  }
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Keep printable content visible and full width */
+  .print-area,
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Hide inputs, selects, icons that are not part of printed content */
+  input,
+  select,
+  textarea,
+  [class*="lucide"],
+  svg[class*="h-4"],
+  svg[class*="h-5"],
+  [data-slot="badge"] {
+    /* Keep these for content, only hide chrome icons */
+  }
+
+  /* Specifically hide the action/button rows in receipts and reports */
+  .receipt-actions,
+  .report-actions,
+  [data-print="hide"] {
+    display: none !important;
+  }
+}
