@@ -7,7 +7,7 @@ import {
   Download,
   Search,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 interface TableDef {
   name: string;
@@ -1162,6 +1162,19 @@ export default function DatabaseManualPage() {
     });
   };
 
+  const navigateToGroup = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    requestAnimationFrame(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const toggleTable = (name: string) => {
     setExpandedTables((prev) => {
       const next = new Set(prev);
@@ -1311,7 +1324,7 @@ export default function DatabaseManualPage() {
             <button
               type="button"
               key={g.id}
-              onClick={() => toggleGroup(g.id)}
+              onClick={() => navigateToGroup(g.id)}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors mb-0.5 ${
                 expanded.has(g.id)
                   ? "bg-blue-50 text-blue-700 font-medium"
@@ -1382,7 +1395,7 @@ export default function DatabaseManualPage() {
           </div>
 
           {filtered.map((group) => (
-            <div key={group.id} className="mb-6">
+            <div key={group.id} id={group.id} className="mb-6">
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}

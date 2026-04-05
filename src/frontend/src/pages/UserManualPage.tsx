@@ -18,7 +18,7 @@ import {
   Truck,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 interface Section {
   id: string;
@@ -382,6 +382,20 @@ export default function UserManualPage() {
     setActiveSection(id);
   };
 
+  const navigateToSection = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setActiveSection(id);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const filtered = search.trim()
     ? sections.filter(
         (s) =>
@@ -480,7 +494,7 @@ export default function UserManualPage() {
               <button
                 type="button"
                 key={s.id}
-                onClick={() => toggle(s.id)}
+                onClick={() => navigateToSection(s.id)}
                 className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left transition-colors mb-0.5 ${
                   isActive
                     ? "bg-blue-50 text-blue-700 font-medium"
