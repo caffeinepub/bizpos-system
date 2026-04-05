@@ -14,14 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -30,11 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Select,
   SelectContent,
@@ -51,8 +39,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Check,
-  ChevronsUpDown,
   Edit,
   FileDown,
   FileText,
@@ -99,7 +85,6 @@ export default function TaxesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<TaxRate | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   const filtered = taxes.filter((t) => {
     const ms = t.name.toLowerCase().includes(search.toLowerCase());
@@ -117,7 +102,6 @@ export default function TaxesPage() {
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
-    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
@@ -141,7 +125,6 @@ export default function TaxesPage() {
       productIds: t.productIds,
       status: t.status,
     });
-    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
@@ -170,15 +153,6 @@ export default function TaxesPage() {
       toast.success("Tax rate created");
     }
     setDialogOpen(false);
-  };
-
-  const toggleCategory = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      categoryIds: prev.categoryIds.includes(id)
-        ? prev.categoryIds.filter((c) => c !== id)
-        : [...prev.categoryIds, id],
-    }));
   };
 
   const toggleProduct = (id: string) => {
@@ -492,78 +466,21 @@ export default function TaxesPage() {
                 <p className="text-xs text-muted-foreground">
                   Search and select one or more categories this tax applies to.
                 </p>
-                <Popover
-                  open={categoryPickerOpen}
-                  onOpenChange={setCategoryPickerOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between font-normal"
-                      data-ocid="taxes.select"
-                    >
-                      {form.categoryIds.length === 0
-                        ? "Select categories..."
-                        : `${form.categoryIds.length} categor${form.categoryIds.length === 1 ? "y" : "ies"} selected`}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search categories..." />
-                      <CommandList>
-                        <CommandEmpty>No categories found.</CommandEmpty>
-                        <CommandGroup>
-                          {itemCategories
-                            .filter((c) => c.status === "active")
-                            .map((cat) => (
-                              <CommandItem
-                                key={cat.id}
-                                value={cat.name}
-                                onSelect={() => toggleCategory(cat.id)}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    form.categoryIds.includes(cat.id)
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  }`}
-                                />
-                                {cat.name}
-                                <span className="ml-auto text-xs text-muted-foreground font-mono">
-                                  {cat.code}
-                                </span>
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {/* Selected categories as chips */}
-                {form.categoryIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {form.categoryIds.map((id) => {
-                      const cat = itemCategories.find((c) => c.id === id);
-                      return cat ? (
-                        <Badge
-                          key={id}
-                          variant="secondary"
-                          className="gap-1 pr-1"
-                        >
-                          {cat.name}
-                          <button
-                            type="button"
-                            onClick={() => toggleCategory(id)}
-                            className="ml-1 rounded-full hover:bg-gray-300"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ) : null;
-                    })}
-                  </div>
-                )}
+                <MultiSelect
+                  data-ocid="taxes.select"
+                  options={itemCategories
+                    .filter((c) => c.status === "active")
+                    .map((cat) => ({
+                      value: cat.id,
+                      label: cat.name,
+                      meta: cat.code,
+                    }))}
+                  value={form.categoryIds}
+                  onChange={(vals) =>
+                    setForm((prev) => ({ ...prev, categoryIds: vals }))
+                  }
+                  placeholder="Search and select categories..."
+                />
               </div>
             )}
 

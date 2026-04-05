@@ -499,334 +499,349 @@ export default function EmployeesPage() {
               {editing ? "Edit Employee" : "Add Employee"}
             </SheetTitle>
           </SheetHeader>
-          <Tabs defaultValue="general" className="mt-4">
-            <TabsList className="mb-4">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="personal">Personal Info</TabsTrigger>
-              <TabsTrigger value="compensation">
-                Compensation & Bank
-              </TabsTrigger>
-              {editing && (
-                <TabsTrigger value="attachments">Attachments</TabsTrigger>
-              )}
-            </TabsList>
+          <div className="px-6">
+            <Tabs defaultValue="general" className="mt-4">
+              <TabsList className="mb-4">
+                <TabsTrigger value="general">General</TabsTrigger>
+                <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                <TabsTrigger value="compensation">
+                  Compensation & Bank
+                </TabsTrigger>
+                {editing && (
+                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                )}
+              </TabsList>
 
-            {/* Tab 1: General */}
-            <TabsContent value="general" className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Employee ID *</Label>
-                  <Input
-                    value={form.employeeId}
-                    onChange={(e) =>
-                      setForm({ ...form, employeeId: e.target.value })
-                    }
-                    data-ocid="employees.input"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Full Name *</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Department</Label>
-                  <Select
-                    value={form.department}
-                    onValueChange={(v) => setForm({ ...form, department: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map((d) => (
-                        <SelectItem key={d} value={d}>
-                          {d}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Designation</Label>
-                  <Input
-                    value={form.designation}
-                    onChange={(e) =>
-                      setForm({ ...form, designation: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Employment Type</Label>
-                  <Select
-                    value={form.employmentType}
-                    onValueChange={(v) =>
-                      setForm({
-                        ...form,
-                        employmentType: v as Employee["employmentType"],
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Monthly-Salaried">
-                        Monthly-Salaried
-                      </SelectItem>
-                      <SelectItem value="Hourly">Hourly</SelectItem>
-                      <SelectItem value="Daily-Wage">Daily-Wage</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Join Date</Label>
-                  <Input
-                    type="date"
-                    value={form.joinDate}
-                    onChange={(e) =>
-                      setForm({ ...form, joinDate: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Phone</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm({ ...form, phone: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                  <Label>Status</Label>
-                  <Select
-                    value={form.status}
-                    onValueChange={(v) =>
-                      setForm({ ...form, status: v as Employee["status"] })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                      <SelectItem value="Terminated">Terminated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Tab 2: Personal Info */}
-            <TabsContent value="personal" className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>NIC / ID Number</Label>
-                  <Input
-                    value={form.nic}
-                    onChange={(e) => setForm({ ...form, nic: e.target.value })}
-                    placeholder="35201-1234567-1"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Gender</Label>
-                  <Select
-                    value={form.gender}
-                    onValueChange={(v) =>
-                      setForm({ ...form, gender: v as Employee["gender"] })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Date of Birth</Label>
-                  <Input
-                    type="date"
-                    value={form.dateOfBirth}
-                    onChange={(e) =>
-                      setForm({ ...form, dateOfBirth: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Marital Status</Label>
-                  <Select
-                    value={form.maritalStatus}
-                    onValueChange={(v) =>
-                      setForm({
-                        ...form,
-                        maritalStatus: v as Employee["maritalStatus"],
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Single">Single</SelectItem>
-                      <SelectItem value="Married">Married</SelectItem>
-                      <SelectItem value="Divorced">Divorced</SelectItem>
-                      <SelectItem value="Widowed">Widowed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                  <Label>Address</Label>
-                  <Textarea
-                    value={form.address}
-                    onChange={(e) =>
-                      setForm({ ...form, address: e.target.value })
-                    }
-                    rows={2}
-                    data-ocid="employees.textarea"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Emergency Contact Name</Label>
-                  <Input
-                    value={form.emergencyContactName}
-                    onChange={(e) =>
-                      setForm({ ...form, emergencyContactName: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Emergency Contact Phone</Label>
-                  <Input
-                    value={form.emergencyContactPhone}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        emergencyContactPhone: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="col-span-2 space-y-1.5">
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(e) =>
-                      setForm({ ...form, notes: e.target.value })
-                    }
-                    rows={2}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Tab 3: Compensation & Bank */}
-            <TabsContent value="compensation" className="space-y-4">
-              <div className="space-y-3">
-                {form.employmentType === "Monthly-Salaried" && (
+              {/* Tab 1: General */}
+              <TabsContent value="general" className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Basic Salary (Monthly)</Label>
+                    <Label>Employee ID *</Label>
                     <Input
-                      type="number"
-                      value={form.basicSalary}
+                      value={form.employeeId}
+                      onChange={(e) =>
+                        setForm({ ...form, employeeId: e.target.value })
+                      }
+                      data-ocid="employees.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Full Name *</Label>
+                    <Input
+                      value={form.name}
+                      onChange={(e) =>
+                        setForm({ ...form, name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Department</Label>
+                    <Select
+                      value={form.department}
+                      onValueChange={(v) => setForm({ ...form, department: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DEPARTMENTS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Designation</Label>
+                    <Input
+                      value={form.designation}
+                      onChange={(e) =>
+                        setForm({ ...form, designation: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Employment Type</Label>
+                    <Select
+                      value={form.employmentType}
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          employmentType: v as Employee["employmentType"],
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Monthly-Salaried">
+                          Monthly-Salaried
+                        </SelectItem>
+                        <SelectItem value="Hourly">Hourly</SelectItem>
+                        <SelectItem value="Daily-Wage">Daily-Wage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Join Date</Label>
+                    <Input
+                      type="date"
+                      value={form.joinDate}
+                      onChange={(e) =>
+                        setForm({ ...form, joinDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Phone</Label>
+                    <Input
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm({ ...form, phone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) =>
+                        setForm({ ...form, email: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Status</Label>
+                    <Select
+                      value={form.status}
+                      onValueChange={(v) =>
+                        setForm({ ...form, status: v as Employee["status"] })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                        <SelectItem value="Terminated">Terminated</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Tab 2: Personal Info */}
+              <TabsContent value="personal" className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>NIC / ID Number</Label>
+                    <Input
+                      value={form.nic}
+                      onChange={(e) =>
+                        setForm({ ...form, nic: e.target.value })
+                      }
+                      placeholder="35201-1234567-1"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Gender</Label>
+                    <Select
+                      value={form.gender}
+                      onValueChange={(v) =>
+                        setForm({ ...form, gender: v as Employee["gender"] })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Date of Birth</Label>
+                    <Input
+                      type="date"
+                      value={form.dateOfBirth}
+                      onChange={(e) =>
+                        setForm({ ...form, dateOfBirth: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Marital Status</Label>
+                    <Select
+                      value={form.maritalStatus}
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          maritalStatus: v as Employee["maritalStatus"],
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Single">Single</SelectItem>
+                        <SelectItem value="Married">Married</SelectItem>
+                        <SelectItem value="Divorced">Divorced</SelectItem>
+                        <SelectItem value="Widowed">Widowed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Address</Label>
+                    <Textarea
+                      value={form.address}
+                      onChange={(e) =>
+                        setForm({ ...form, address: e.target.value })
+                      }
+                      rows={2}
+                      data-ocid="employees.textarea"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Emergency Contact Name</Label>
+                    <Input
+                      value={form.emergencyContactName}
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          basicSalary: Number(e.target.value),
+                          emergencyContactName: e.target.value,
                         })
                       }
                     />
                   </div>
-                )}
-                {form.employmentType === "Hourly" && (
                   <div className="space-y-1.5">
-                    <Label>Hourly Rate</Label>
+                    <Label>Emergency Contact Phone</Label>
                     <Input
-                      type="number"
-                      value={form.hourlyRate}
+                      value={form.emergencyContactPhone}
                       onChange={(e) =>
-                        setForm({ ...form, hourlyRate: Number(e.target.value) })
+                        setForm({
+                          ...form,
+                          emergencyContactPhone: e.target.value,
+                        })
                       }
                     />
                   </div>
-                )}
-                {form.employmentType === "Daily-Wage" && (
-                  <div className="space-y-1.5">
-                    <Label>Daily Rate</Label>
-                    <Input
-                      type="number"
-                      value={form.dailyRate}
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Notes</Label>
+                    <Textarea
+                      value={form.notes}
                       onChange={(e) =>
-                        setForm({ ...form, dailyRate: Number(e.target.value) })
+                        setForm({ ...form, notes: e.target.value })
                       }
-                    />
-                  </div>
-                )}
-                <Separator />
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Bank Name</Label>
-                    <Input
-                      value={form.bankName}
-                      onChange={(e) =>
-                        setForm({ ...form, bankName: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Account Number</Label>
-                    <Input
-                      value={form.accountNumber}
-                      onChange={(e) =>
-                        setForm({ ...form, accountNumber: e.target.value })
-                      }
+                      rows={2}
                     />
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-            {editing && (
-              <TabsContent value="attachments">
-                <AttachmentManager
-                  moduleKey="employees"
-                  recordId={editing.id}
-                />
               </TabsContent>
-            )}
-          </Tabs>
 
-          <div className="flex gap-2 mt-6">
-            <Button
-              onClick={handleSave}
-              className="flex-1"
-              data-ocid="employees.submit_button"
-            >
-              {editing ? "Update" : "Add"} Employee
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setSheetOpen(false)}
-              data-ocid="employees.cancel_button"
-            >
-              Cancel
-            </Button>
+              {/* Tab 3: Compensation & Bank */}
+              <TabsContent value="compensation" className="space-y-4">
+                <div className="space-y-3">
+                  {form.employmentType === "Monthly-Salaried" && (
+                    <div className="space-y-1.5">
+                      <Label>Basic Salary (Monthly)</Label>
+                      <Input
+                        type="number"
+                        value={form.basicSalary}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            basicSalary: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                  {form.employmentType === "Hourly" && (
+                    <div className="space-y-1.5">
+                      <Label>Hourly Rate</Label>
+                      <Input
+                        type="number"
+                        value={form.hourlyRate}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            hourlyRate: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                  {form.employmentType === "Daily-Wage" && (
+                    <div className="space-y-1.5">
+                      <Label>Daily Rate</Label>
+                      <Input
+                        type="number"
+                        value={form.dailyRate}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            dailyRate: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Bank Name</Label>
+                      <Input
+                        value={form.bankName}
+                        onChange={(e) =>
+                          setForm({ ...form, bankName: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Account Number</Label>
+                      <Input
+                        value={form.accountNumber}
+                        onChange={(e) =>
+                          setForm({ ...form, accountNumber: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              {editing && (
+                <TabsContent value="attachments">
+                  <AttachmentManager
+                    moduleKey="employees"
+                    recordId={editing.id}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
+
+            <div className="flex gap-2 mt-6 pb-6">
+              <Button
+                onClick={handleSave}
+                className="flex-1"
+                data-ocid="employees.submit_button"
+              >
+                {editing ? "Update" : "Add"} Employee
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                data-ocid="employees.cancel_button"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>

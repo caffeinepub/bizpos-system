@@ -12,14 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -27,11 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { SingleSearchSelect } from "@/components/ui/multi-select";
 import {
   Select,
   SelectContent,
@@ -47,14 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Check,
-  ChevronsUpDown,
-  Download,
-  FileSpreadsheet,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -92,7 +73,13 @@ interface SaleRecord {
   createdAt?: string;
   customerId?: string;
   customerName?: string;
-  items?: { itemId: string; itemName: string; qty: number; price: number }[];
+  items?: {
+    itemId: string;
+    itemName: string;
+    qty?: number;
+    quantity?: number;
+    price: number;
+  }[];
   total?: number;
 }
 
@@ -129,12 +116,6 @@ export default function CreditNotesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<CreditNote | null>(null);
 
-  // Combobox open states
-  const [salePickerOpen, setSalePickerOpen] = useState(false);
-  const [itemPickerOpen, setItemPickerOpen] = useState<Record<number, boolean>>(
-    {},
-  );
-
   const [form, setForm] = useState({
     customerId: "",
     saleRef: "",
@@ -169,8 +150,6 @@ export default function CreditNotesPage() {
       reason: "",
       items: [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     });
-    setSalePickerOpen(false);
-    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
@@ -183,20 +162,22 @@ export default function CreditNotesPage() {
       reason: n.reason,
       items: n.items.map((i) => ({ ...i })),
     });
-    setSalePickerOpen(false);
-    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
   // When a sale is selected, auto-populate items
   const onSelectSale = (sale: SaleRecord) => {
-    const saleItems = (sale.items || []).map((si) => ({
-      itemId: si.itemId,
-      itemName: si.itemName,
-      qty: si.qty,
-      price: si.price,
-      subtotal: si.qty * si.price,
-    }));
+    const saleItems = (sale.items || []).map((si) => {
+      const qty = Number(si.quantity ?? si.qty ?? 1) || 1;
+      const price = Number(si.price) || 0;
+      return {
+        itemId: si.itemId,
+        itemName: si.itemName,
+        qty,
+        price,
+        subtotal: qty * price,
+      };
+    });
     setForm((f) => ({
       ...f,
       saleRef: sale.id,
@@ -205,7 +186,6 @@ export default function CreditNotesPage() {
           ? saleItems
           : [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     }));
-    setSalePickerOpen(false);
   };
 
   const addFormItem = () =>
@@ -233,10 +213,11 @@ export default function CreditNotesPage() {
           const found = items.find((it) => it.id === value);
           newItem.itemName = found ? found.name : "";
           newItem.price = found ? found.salePrice : 0;
-          newItem.subtotal = newItem.qty * newItem.price;
+          newItem.subtotal = (newItem.qty || 0) * (newItem.price || 0);
         } else if (field === "qty" || field === "price") {
-          const qty = field === "qty" ? Number(value) : newItem.qty;
-          const price = field === "price" ? Number(value) : newItem.price;
+          const qty = field === "qty" ? Number(value) || 0 : newItem.qty || 0;
+          const price =
+            field === "price" ? Number(value) || 0 : newItem.price || 0;
           newItem.subtotal = qty * price;
         }
         return newItem;
@@ -245,7 +226,10 @@ export default function CreditNotesPage() {
     });
   };
 
-  const totalAmount = form.items.reduce((s, i) => s + i.subtotal, 0);
+  const totalAmount = form.items.reduce(
+    (s, i) => s + (Number(i.subtotal) || 0),
+    0,
+  );
 
   const handleSave = (status: "Draft" | "Posted") => {
     if (!form.customerId || !form.date || form.items.some((i) => !i.itemId)) {
@@ -632,7 +616,6 @@ export default function CreditNotesPage() {
                         },
                       ],
                     }));
-                    setSalePickerOpen(false);
                   }}
                 >
                   <SelectTrigger data-ocid="credit_notes.select">
@@ -668,63 +651,34 @@ export default function CreditNotesPage() {
                   Select a sale to auto-fill return items. Leave blank to add
                   items manually.
                 </p>
-                <Popover open={salePickerOpen} onOpenChange={setSalePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      aria-expanded={salePickerOpen}
-                      className="w-full justify-between font-normal"
-                      data-ocid="credit_notes.select"
-                    >
-                      {form.saleRef
-                        ? (() => {
-                            const s = customerSales.find(
-                              (x) => x.id === form.saleRef,
-                            );
-                            return s
-                              ? `${s.id} — ${s.saleDate || s.createdAt?.slice(0, 10) || ""}`
-                              : form.saleRef;
-                          })()
-                        : form.customerId
-                          ? "Search sales for this customer..."
-                          : "Select a customer first"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[480px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search by sale ID, date or amount..." />
-                      <CommandList>
-                        <CommandEmpty>
-                          {form.customerId
-                            ? "No sales found for this customer."
-                            : "Please select a customer first."}
-                        </CommandEmpty>
-                        <CommandGroup heading="Available Sales">
-                          {customerSales.map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              value={`${s.id} ${s.saleDate || ""} ${s.customerName || ""}`}
-                              onSelect={() => onSelectSale(s)}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${form.saleRef === s.id ? "opacity-100" : "opacity-0"}`}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{s.id}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {s.saleDate || s.createdAt?.slice(0, 10)}{" "}
-                                  &bull; {s.customerName} &bull;{" "}
-                                  {(s.total || 0).toLocaleString()}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <SingleSearchSelect
+                  data-ocid="credit_notes.select"
+                  options={customerSales.map((s) => ({
+                    value: s.id,
+                    label: s.id,
+                    description: `${s.saleDate || s.createdAt?.slice(0, 10) || ""} • ${s.customerName || ""} • ${(s.total || 0).toLocaleString()}`,
+                  }))}
+                  value={form.saleRef}
+                  onChange={(val) => {
+                    if (val) {
+                      const s = customerSales.find((x) => x.id === val);
+                      if (s) onSelectSale(s);
+                    } else {
+                      setForm((f) => ({ ...f, saleRef: "" }));
+                    }
+                  }}
+                  placeholder={
+                    form.customerId
+                      ? "Search sales for this customer..."
+                      : "Select a customer first"
+                  }
+                  disabled={!form.customerId}
+                  emptyMessage={
+                    form.customerId
+                      ? "No sales found for this customer."
+                      : "Please select a customer first."
+                  }
+                />
                 {form.saleRef && (
                   <button
                     type="button"
@@ -773,7 +727,7 @@ export default function CreditNotesPage() {
                   Add Item
                 </Button>
               </div>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-visible">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -789,65 +743,19 @@ export default function CreditNotesPage() {
                       <TableRow key={`item-row-${String(idx)}`}>
                         <TableCell className="min-w-[200px]">
                           {/* Searchable item picker */}
-                          <Popover
-                            open={itemPickerOpen[idx] ?? false}
-                            onOpenChange={(open) =>
-                              setItemPickerOpen((prev) => ({
-                                ...prev,
-                                [idx]: open,
-                              }))
+                          <SingleSearchSelect
+                            options={items.map((it) => ({
+                              value: it.id,
+                              label: it.name,
+                              description: it.sku || undefined,
+                            }))}
+                            value={item.itemId}
+                            onChange={(val) =>
+                              updateFormItem(idx, "itemId", val)
                             }
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-between font-normal text-left"
-                              >
-                                <span className="truncate">
-                                  {item.itemId
-                                    ? items.find((it) => it.id === item.itemId)
-                                        ?.name || item.itemName
-                                    : "Select item..."}
-                                </span>
-                                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64 p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Search items..." />
-                                <CommandList>
-                                  <CommandEmpty>No items found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {items.map((it) => (
-                                      <CommandItem
-                                        key={it.id}
-                                        value={`${it.name} ${it.sku || ""}`}
-                                        onSelect={() => {
-                                          updateFormItem(idx, "itemId", it.id);
-                                          setItemPickerOpen((prev) => ({
-                                            ...prev,
-                                            [idx]: false,
-                                          }));
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${item.itemId === it.id ? "opacity-100" : "opacity-0"}`}
-                                        />
-                                        <div className="flex flex-col">
-                                          <span>{it.name}</span>
-                                          {it.sku && (
-                                            <span className="text-xs text-muted-foreground font-mono">
-                                              {it.sku}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                            placeholder="Select item..."
+                            emptyMessage="No items found."
+                          />
                         </TableCell>
                         <TableCell>
                           <Input
@@ -876,7 +784,7 @@ export default function CreditNotesPage() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          {item.subtotal.toLocaleString()}
+                          {(Number(item.subtotal) || 0).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Button

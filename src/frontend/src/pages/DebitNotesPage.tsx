@@ -12,14 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -27,11 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { SingleSearchSelect } from "@/components/ui/multi-select";
 import {
   Select,
   SelectContent,
@@ -47,14 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Check,
-  ChevronsUpDown,
-  Download,
-  FileSpreadsheet,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -129,11 +110,6 @@ export default function DebitNotesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<DebitNote | null>(null);
 
-  const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
-  const [itemPickerOpen, setItemPickerOpen] = useState<Record<number, boolean>>(
-    {},
-  );
-
   const [form, setForm] = useState({
     supplierId: "",
     purchaseRef: "",
@@ -168,8 +144,6 @@ export default function DebitNotesPage() {
       reason: "",
       items: [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     });
-    setPurchasePickerOpen(false);
-    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
@@ -182,8 +156,6 @@ export default function DebitNotesPage() {
       reason: n.reason,
       items: n.items.map((i) => ({ ...i })),
     });
-    setPurchasePickerOpen(false);
-    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
@@ -204,7 +176,6 @@ export default function DebitNotesPage() {
           ? purchaseItems
           : [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     }));
-    setPurchasePickerOpen(false);
   };
 
   const addFormItem = () =>
@@ -637,7 +608,6 @@ export default function DebitNotesPage() {
                         },
                       ],
                     }));
-                    setPurchasePickerOpen(false);
                   }}
                 >
                   <SelectTrigger data-ocid="debit_notes.select">
@@ -673,70 +643,34 @@ export default function DebitNotesPage() {
                   Select a purchase to auto-fill return items. Leave blank to
                   add items manually.
                 </p>
-                <Popover
-                  open={purchasePickerOpen}
-                  onOpenChange={setPurchasePickerOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      aria-expanded={purchasePickerOpen}
-                      className="w-full justify-between font-normal"
-                      data-ocid="debit_notes.select"
-                    >
-                      {form.purchaseRef
-                        ? (() => {
-                            const p = supplierPurchases.find(
-                              (x) => x.id === form.purchaseRef,
-                            );
-                            return p
-                              ? `${p.id} — ${p.date || p.createdAt?.slice(0, 10) || ""}`
-                              : form.purchaseRef;
-                          })()
-                        : form.supplierId
-                          ? "Search purchases for this supplier..."
-                          : "Select a supplier first"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[480px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search by purchase ID or date..." />
-                      <CommandList>
-                        <CommandEmpty>
-                          {form.supplierId
-                            ? "No purchases found for this supplier."
-                            : "Please select a supplier first."}
-                        </CommandEmpty>
-                        <CommandGroup heading="Available Purchases">
-                          {supplierPurchases.map((p) => (
-                            <CommandItem
-                              key={p.id}
-                              value={`${p.id} ${p.date || ""} ${p.supplierName || ""}`}
-                              onSelect={() => onSelectPurchase(p)}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${form.purchaseRef === p.id ? "opacity-100" : "opacity-0"}`}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{p.id}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {p.date || p.createdAt?.slice(0, 10)} &bull;{" "}
-                                  {p.supplierName} &bull;{" "}
-                                  {(
-                                    p.total ||
-                                    p.totalAmount ||
-                                    0
-                                  ).toLocaleString()}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <SingleSearchSelect
+                  data-ocid="debit_notes.select"
+                  options={supplierPurchases.map((p) => ({
+                    value: p.id,
+                    label: p.id,
+                    description: `${p.date || p.createdAt?.slice(0, 10) || ""} • ${p.supplierName || ""} • ${(p.total || p.totalAmount || 0).toLocaleString()}`,
+                  }))}
+                  value={form.purchaseRef}
+                  onChange={(val) => {
+                    if (val) {
+                      const p = supplierPurchases.find((x) => x.id === val);
+                      if (p) onSelectPurchase(p);
+                    } else {
+                      setForm((f) => ({ ...f, purchaseRef: "" }));
+                    }
+                  }}
+                  placeholder={
+                    form.supplierId
+                      ? "Search purchases for this supplier..."
+                      : "Select a supplier first"
+                  }
+                  disabled={!form.supplierId}
+                  emptyMessage={
+                    form.supplierId
+                      ? "No purchases found for this supplier."
+                      : "Please select a supplier first."
+                  }
+                />
                 {form.purchaseRef && (
                   <button
                     type="button"
@@ -801,65 +735,19 @@ export default function DebitNotesPage() {
                       <TableRow key={`item-row-${String(idx)}`}>
                         <TableCell className="min-w-[200px]">
                           {/* Searchable item picker */}
-                          <Popover
-                            open={itemPickerOpen[idx] ?? false}
-                            onOpenChange={(open) =>
-                              setItemPickerOpen((prev) => ({
-                                ...prev,
-                                [idx]: open,
-                              }))
+                          <SingleSearchSelect
+                            options={items.map((it) => ({
+                              value: it.id,
+                              label: it.name,
+                              description: it.sku || undefined,
+                            }))}
+                            value={item.itemId}
+                            onChange={(val) =>
+                              updateFormItem(idx, "itemId", val)
                             }
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-between font-normal text-left"
-                              >
-                                <span className="truncate">
-                                  {item.itemId
-                                    ? items.find((it) => it.id === item.itemId)
-                                        ?.name || item.itemName
-                                    : "Select item..."}
-                                </span>
-                                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-64 p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Search items..." />
-                                <CommandList>
-                                  <CommandEmpty>No items found.</CommandEmpty>
-                                  <CommandGroup>
-                                    {items.map((it) => (
-                                      <CommandItem
-                                        key={it.id}
-                                        value={`${it.name} ${it.sku || ""}`}
-                                        onSelect={() => {
-                                          updateFormItem(idx, "itemId", it.id);
-                                          setItemPickerOpen((prev) => ({
-                                            ...prev,
-                                            [idx]: false,
-                                          }));
-                                        }}
-                                      >
-                                        <Check
-                                          className={`mr-2 h-4 w-4 ${item.itemId === it.id ? "opacity-100" : "opacity-0"}`}
-                                        />
-                                        <div className="flex flex-col">
-                                          <span>{it.name}</span>
-                                          {it.sku && (
-                                            <span className="text-xs text-muted-foreground font-mono">
-                                              {it.sku}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                            placeholder="Select item..."
+                            emptyMessage="No items found."
+                          />
                         </TableCell>
                         <TableCell>
                           <Input
