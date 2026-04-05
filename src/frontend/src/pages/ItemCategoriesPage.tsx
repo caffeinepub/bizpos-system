@@ -508,7 +508,7 @@ export default function ItemCategoriesPage() {
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="w-full max-w-[95vw] sm:max-w-2xl"
+          className="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto"
           data-ocid="item_categories.dialog"
         >
           <DialogHeader>

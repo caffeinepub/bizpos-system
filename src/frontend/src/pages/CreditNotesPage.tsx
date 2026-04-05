@@ -10,7 +10,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +27,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -34,8 +47,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
-import { Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Download,
+  FileSpreadsheet,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -67,6 +86,16 @@ export interface CreditNote {
   modifiedAt: string;
 }
 
+interface SaleRecord {
+  id: string;
+  saleDate?: string;
+  createdAt?: string;
+  customerId?: string;
+  customerName?: string;
+  items?: { itemId: string; itemName: string; qty: number; price: number }[];
+  total?: number;
+}
+
 const STORAGE_KEY = "bizpos_credit_notes";
 
 function load(): CreditNote[] {
@@ -78,6 +107,14 @@ function load(): CreditNote[] {
 }
 function save(data: CreditNote[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadSales(): SaleRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem("bizpos_sales") || "[]");
+  } catch {
+    return [];
+  }
 }
 
 export default function CreditNotesPage() {
@@ -92,6 +129,12 @@ export default function CreditNotesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<CreditNote | null>(null);
 
+  // Combobox open states
+  const [salePickerOpen, setSalePickerOpen] = useState(false);
+  const [itemPickerOpen, setItemPickerOpen] = useState<Record<number, boolean>>(
+    {},
+  );
+
   const [form, setForm] = useState({
     customerId: "",
     saleRef: "",
@@ -101,6 +144,11 @@ export default function CreditNotesPage() {
   });
 
   const reload = () => setNotes(load());
+
+  // Sales filtered by selected customer
+  const customerSales = loadSales().filter(
+    (s) => !form.customerId || s.customerId === form.customerId,
+  );
 
   const filtered = notes.filter((n) => {
     const matchSearch =
@@ -121,6 +169,8 @@ export default function CreditNotesPage() {
       reason: "",
       items: [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     });
+    setSalePickerOpen(false);
+    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
@@ -133,7 +183,29 @@ export default function CreditNotesPage() {
       reason: n.reason,
       items: n.items.map((i) => ({ ...i })),
     });
+    setSalePickerOpen(false);
+    setItemPickerOpen({});
     setDialogOpen(true);
+  };
+
+  // When a sale is selected, auto-populate items
+  const onSelectSale = (sale: SaleRecord) => {
+    const saleItems = (sale.items || []).map((si) => ({
+      itemId: si.itemId,
+      itemName: si.itemName,
+      qty: si.qty,
+      price: si.price,
+      subtotal: si.qty * si.price,
+    }));
+    setForm((f) => ({
+      ...f,
+      saleRef: sale.id,
+      items:
+        saleItems.length > 0
+          ? saleItems
+          : [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
+    }));
+    setSalePickerOpen(false);
   };
 
   const addFormItem = () =>
@@ -144,8 +216,10 @@ export default function CreditNotesPage() {
         { itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 },
       ],
     }));
+
   const removeFormItem = (idx: number) =>
     setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+
   const updateFormItem = (
     idx: number,
     field: string,
@@ -230,7 +304,6 @@ export default function CreditNotesPage() {
         for (const item of form.items) {
           adjustStock(item.itemId, item.qty);
         }
-        // Post journal: Dr Sales Revenue / Cr Accounts Receivable
         const salesRevId =
           accountMapping?.salesRevenueId || "acc-400-01-01-0001";
         const arId = accountMapping?.accountsReceivableId || "acc-100-02-04";
@@ -277,7 +350,6 @@ export default function CreditNotesPage() {
     for (const item of n.items) {
       adjustStock(item.itemId, item.qty);
     }
-    // Post journal: Dr Sales Revenue / Cr Accounts Receivable
     const salesRevId = accountMapping?.salesRevenueId || "acc-400-01-01-0001";
     const arId = accountMapping?.accountsReceivableId || "acc-100-02-04";
     postJournalEntry?.({
@@ -378,7 +450,7 @@ export default function CreditNotesPage() {
             <PageHelp pageId="credit-notes" />
           </div>
           <p className="text-gray-600 mt-1">
-            Sales returns & credit notes — restocks inventory on posting
+            Sales returns &amp; credit notes — restocks inventory on posting
           </p>
         </div>
         <div className="flex gap-2">
@@ -532,14 +604,36 @@ export default function CreditNotesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Info banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+              <strong>How to use:</strong> Select the customer, then optionally
+              pick the original sale to auto-fill return items. Adjust
+              quantities and prices as needed before saving.
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
+              {/* Customer dropdown */}
               <div>
                 <Label>Customer *</Label>
                 <Select
                   value={form.customerId}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, customerId: v }))
-                  }
+                  onValueChange={(v) => {
+                    setForm((f) => ({
+                      ...f,
+                      customerId: v,
+                      saleRef: "",
+                      items: [
+                        {
+                          itemId: "",
+                          itemName: "",
+                          qty: 1,
+                          price: 0,
+                          subtotal: 0,
+                        },
+                      ],
+                    }));
+                    setSalePickerOpen(false);
+                  }}
                 >
                   <SelectTrigger data-ocid="credit_notes.select">
                     <SelectValue placeholder="Select customer" />
@@ -553,6 +647,8 @@ export default function CreditNotesPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Date */}
               <div>
                 <Label>Date *</Label>
                 <Input
@@ -564,30 +660,111 @@ export default function CreditNotesPage() {
                   data-ocid="credit_notes.input"
                 />
               </div>
-              <div>
-                <Label>Original Sale Reference</Label>
-                <Input
-                  value={form.saleRef}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, saleRef: e.target.value }))
-                  }
-                  placeholder="e.g. SALE-2026-001"
-                  data-ocid="credit_notes.input"
-                />
+
+              {/* Original Sale — searchable combobox */}
+              <div className="col-span-2">
+                <Label>Original Sale (optional)</Label>
+                <p className="text-xs text-muted-foreground mb-1.5">
+                  Select a sale to auto-fill return items. Leave blank to add
+                  items manually.
+                </p>
+                <Popover open={salePickerOpen} onOpenChange={setSalePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      aria-expanded={salePickerOpen}
+                      className="w-full justify-between font-normal"
+                      data-ocid="credit_notes.select"
+                    >
+                      {form.saleRef
+                        ? (() => {
+                            const s = customerSales.find(
+                              (x) => x.id === form.saleRef,
+                            );
+                            return s
+                              ? `${s.id} — ${s.saleDate || s.createdAt?.slice(0, 10) || ""}`
+                              : form.saleRef;
+                          })()
+                        : form.customerId
+                          ? "Search sales for this customer..."
+                          : "Select a customer first"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[480px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search by sale ID, date or amount..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          {form.customerId
+                            ? "No sales found for this customer."
+                            : "Please select a customer first."}
+                        </CommandEmpty>
+                        <CommandGroup heading="Available Sales">
+                          {customerSales.map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={`${s.id} ${s.saleDate || ""} ${s.customerName || ""}`}
+                              onSelect={() => onSelectSale(s)}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${form.saleRef === s.id ? "opacity-100" : "opacity-0"}`}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{s.id}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {s.saleDate || s.createdAt?.slice(0, 10)}{" "}
+                                  &bull; {s.customerName} &bull;{" "}
+                                  {(s.total || 0).toLocaleString()}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {form.saleRef && (
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 underline mt-1"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        saleRef: "",
+                        items: [
+                          {
+                            itemId: "",
+                            itemName: "",
+                            qty: 1,
+                            price: 0,
+                            subtotal: 0,
+                          },
+                        ],
+                      }))
+                    }
+                  >
+                    Clear selection
+                  </button>
+                )}
               </div>
-              <div>
+
+              {/* Reason */}
+              <div className="col-span-2">
                 <Label>Reason *</Label>
                 <Input
                   value={form.reason}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, reason: e.target.value }))
                   }
-                  placeholder="Reason for return"
+                  placeholder="e.g. Damaged goods, Wrong item delivered"
                   data-ocid="credit_notes.input"
                 />
               </div>
             </div>
 
+            {/* Return Items */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <Label>Return Items</Label>
@@ -596,79 +773,135 @@ export default function CreditNotesPage() {
                   Add Item
                 </Button>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Subtotal</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {form.items.map((item, idx) => (
-                    <TableRow key={`${item.itemId}-${String(idx)}`}>
-                      <TableCell>
-                        <Select
-                          value={item.itemId}
-                          onValueChange={(v) =>
-                            updateFormItem(idx, "itemId", v)
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {items.map((it) => (
-                              <SelectItem key={it.id} value={it.id}>
-                                {it.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.qty}
-                          min={1}
-                          onChange={(e) =>
-                            updateFormItem(idx, "qty", Number(e.target.value))
-                          }
-                          className="w-20"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.price}
-                          min={0}
-                          onChange={(e) =>
-                            updateFormItem(idx, "price", Number(e.target.value))
-                          }
-                          className="w-24"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {item.subtotal.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600"
-                          onClick={() => removeFormItem(idx)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Unit Price</TableHead>
+                      <TableHead>Subtotal</TableHead>
+                      <TableHead />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="text-right mt-2 font-bold text-lg">
-                Total: {totalAmount.toLocaleString()}
+                  </TableHeader>
+                  <TableBody>
+                    {form.items.map((item, idx) => (
+                      <TableRow key={`item-row-${String(idx)}`}>
+                        <TableCell className="min-w-[200px]">
+                          {/* Searchable item picker */}
+                          <Popover
+                            open={itemPickerOpen[idx] ?? false}
+                            onOpenChange={(open) =>
+                              setItemPickerOpen((prev) => ({
+                                ...prev,
+                                [idx]: open,
+                              }))
+                            }
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between font-normal text-left"
+                              >
+                                <span className="truncate">
+                                  {item.itemId
+                                    ? items.find((it) => it.id === item.itemId)
+                                        ?.name || item.itemName
+                                    : "Select item..."}
+                                </span>
+                                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search items..." />
+                                <CommandList>
+                                  <CommandEmpty>No items found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {items.map((it) => (
+                                      <CommandItem
+                                        key={it.id}
+                                        value={`${it.name} ${it.sku || ""}`}
+                                        onSelect={() => {
+                                          updateFormItem(idx, "itemId", it.id);
+                                          setItemPickerOpen((prev) => ({
+                                            ...prev,
+                                            [idx]: false,
+                                          }));
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${item.itemId === it.id ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span>{it.name}</span>
+                                          {it.sku && (
+                                            <span className="text-xs text-muted-foreground font-mono">
+                                              {it.sku}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.qty}
+                            min={1}
+                            onChange={(e) =>
+                              updateFormItem(idx, "qty", Number(e.target.value))
+                            }
+                            className="w-20"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.price}
+                            min={0}
+                            onChange={(e) =>
+                              updateFormItem(
+                                idx,
+                                "price",
+                                Number(e.target.value),
+                              )
+                            }
+                            className="w-24"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.subtotal.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600"
+                            onClick={() => removeFormItem(idx)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end mt-3">
+                <div className="bg-gray-50 border rounded-lg px-4 py-2">
+                  <span className="text-sm text-gray-600 mr-3">
+                    Total Return Amount:
+                  </span>
+                  <span className="font-bold text-lg">
+                    {totalAmount.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -681,7 +914,7 @@ export default function CreditNotesPage() {
               </p>
             )}
 
-            <div className="flex gap-2 justify-end pt-2">
+            <div className="flex gap-2 justify-end pt-2 border-t">
               <Button
                 variant="outline"
                 onClick={() => setDialogOpen(false)}

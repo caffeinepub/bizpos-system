@@ -2042,7 +2042,7 @@ export default function AppLayout() {
 
   const clearFlyout = () => {
     if (flyoutTimeoutRef.current) clearTimeout(flyoutTimeoutRef.current);
-    flyoutTimeoutRef.current = setTimeout(() => setFlyout(null), 80);
+    flyoutTimeoutRef.current = setTimeout(() => setFlyout(null), 200);
   };
 
   const keepFlyout = () => {
@@ -2152,7 +2152,6 @@ export default function AppLayout() {
             handleGroupHover(group.key, e);
           }
         }}
-        onMouseLeave={clearFlyout}
         data-ocid={`nav.${group.key}.link`}
       >
         <Icon className="h-5 w-5 flex-shrink-0" />
@@ -2218,49 +2217,65 @@ export default function AppLayout() {
 
       {/* Flyout Panel */}
       {flyout && activeFlyoutGroup && (
-        <div
-          className="fixed z-50"
-          style={{
-            left: sidebarW,
-            top: Math.max(
-              8,
-              Math.min(
-                flyout.y - 8,
-                window.innerHeight -
-                  (activeFlyoutGroup.subItems?.length ?? 0) * 44 -
-                  24,
+        <>
+          {/* Invisible bridge to prevent flyout disappearing when moving from sidebar to panel */}
+          <div
+            className="fixed z-49"
+            style={{
+              left: sidebarW - 8,
+              top: Math.max(8, flyout.y - 20),
+              width: 16,
+              height: Math.min(
+                (activeFlyoutGroup.subItems?.length ?? 0) * 44 + 60,
+                window.innerHeight - 32,
               ),
-            ),
-          }}
-          onMouseEnter={keepFlyout}
-          onMouseLeave={clearFlyout}
-        >
-          <div className="bg-white border border-slate-200 rounded-r-xl shadow-xl min-w-52 overflow-hidden">
-            <div className="px-4 py-2.5 bg-blue-600 text-white">
-              <p className="text-xs font-semibold uppercase tracking-wider">
-                {activeFlyoutGroup.label}
-              </p>
-            </div>
-            <div className="py-1">
-              {activeFlyoutGroup.subItems?.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    onClick={() => navigateTo(item.path)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
+            }}
+            onMouseEnter={keepFlyout}
+          />
+          <div
+            className="fixed z-50"
+            style={{
+              left: sidebarW,
+              top: Math.max(
+                8,
+                Math.min(
+                  flyout.y - 8,
+                  window.innerHeight -
+                    (activeFlyoutGroup.subItems?.length ?? 0) * 44 -
+                    24,
+                ),
+              ),
+            }}
+            onMouseEnter={keepFlyout}
+            onMouseLeave={clearFlyout}
+          >
+            <div className="bg-white border border-slate-200 rounded-r-xl shadow-xl min-w-52 overflow-hidden">
+              <div className="px-4 py-2.5 bg-blue-600 text-white">
+                <p className="text-xs font-semibold uppercase tracking-wider">
+                  {activeFlyoutGroup.label}
+                </p>
+              </div>
+              <div className="py-1">
+                {activeFlyoutGroup.subItems?.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <button
+                      key={item.path}
+                      type="button"
+                      onClick={() => navigateTo(item.path)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
                       ${active ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"}`}
-                  >
-                    <Icon className="h-4 w-4 flex-shrink-0 opacity-70" />
-                    {item.label}
-                  </button>
-                );
-              })}
+                    >
+                      <Icon className="h-4 w-4 flex-shrink-0 opacity-70" />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Mobile overlay */}

@@ -12,6 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -19,6 +27,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -34,7 +47,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Download,
+  FileSpreadsheet,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -66,6 +86,17 @@ export interface DebitNote {
   modifiedAt: string;
 }
 
+interface PurchaseRecord {
+  id: string;
+  date?: string;
+  createdAt?: string;
+  supplierId?: string;
+  supplierName?: string;
+  items?: { itemId: string; itemName: string; qty: number; price: number }[];
+  total?: number;
+  totalAmount?: number;
+}
+
 const STORAGE_KEY = "bizpos_debit_notes";
 function load(): DebitNote[] {
   try {
@@ -76,6 +107,14 @@ function load(): DebitNote[] {
 }
 function save(data: DebitNote[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadPurchases(): PurchaseRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem("bizpos_purchases") || "[]");
+  } catch {
+    return [];
+  }
 }
 
 export default function DebitNotesPage() {
@@ -90,6 +129,11 @@ export default function DebitNotesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<DebitNote | null>(null);
 
+  const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
+  const [itemPickerOpen, setItemPickerOpen] = useState<Record<number, boolean>>(
+    {},
+  );
+
   const [form, setForm] = useState({
     supplierId: "",
     purchaseRef: "",
@@ -99,6 +143,11 @@ export default function DebitNotesPage() {
   });
 
   const reload = () => setNotes(load());
+
+  // Purchases filtered by selected supplier
+  const supplierPurchases = loadPurchases().filter(
+    (p) => !form.supplierId || p.supplierId === form.supplierId,
+  );
 
   const filtered = notes.filter((n) => {
     const matchSearch =
@@ -119,6 +168,8 @@ export default function DebitNotesPage() {
       reason: "",
       items: [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
     });
+    setPurchasePickerOpen(false);
+    setItemPickerOpen({});
     setDialogOpen(true);
   };
 
@@ -131,7 +182,29 @@ export default function DebitNotesPage() {
       reason: n.reason,
       items: n.items.map((i) => ({ ...i })),
     });
+    setPurchasePickerOpen(false);
+    setItemPickerOpen({});
     setDialogOpen(true);
+  };
+
+  // When a purchase is selected, auto-populate items
+  const onSelectPurchase = (purchase: PurchaseRecord) => {
+    const purchaseItems = (purchase.items || []).map((pi) => ({
+      itemId: pi.itemId,
+      itemName: pi.itemName,
+      qty: pi.qty,
+      price: pi.price,
+      subtotal: pi.qty * pi.price,
+    }));
+    setForm((f) => ({
+      ...f,
+      purchaseRef: purchase.id,
+      items:
+        purchaseItems.length > 0
+          ? purchaseItems
+          : [{ itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 }],
+    }));
+    setPurchasePickerOpen(false);
   };
 
   const addFormItem = () =>
@@ -142,8 +215,10 @@ export default function DebitNotesPage() {
         { itemId: "", itemName: "", qty: 1, price: 0, subtotal: 0 },
       ],
     }));
+
   const removeFormItem = (idx: number) =>
     setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
+
   const updateFormItem = (
     idx: number,
     field: string,
@@ -227,7 +302,6 @@ export default function DebitNotesPage() {
         for (const item of form.items) {
           adjustStock(item.itemId, -item.qty);
         }
-        // Post journal: Dr Accounts Payable / Cr Inventory Asset
         const apId = accountMapping?.accountsPayableId || "acc-300-02-01-0001";
         const invId = accountMapping?.inventoryAssetId || "acc-100-02-03";
         postJournalEntry?.({
@@ -273,7 +347,6 @@ export default function DebitNotesPage() {
     for (const item of n.items) {
       adjustStock(item.itemId, -item.qty);
     }
-    // Post journal: Dr Accounts Payable / Cr Inventory Asset
     const apId = accountMapping?.accountsPayableId || "acc-300-02-01-0001";
     const invId = accountMapping?.inventoryAssetId || "acc-100-02-03";
     postJournalEntry?.({
@@ -382,7 +455,7 @@ export default function DebitNotesPage() {
             <PageHelp pageId="debit-notes" />
           </div>
           <p className="text-gray-600 mt-1">
-            Purchase returns & debit notes — reduces inventory on posting
+            Purchase returns &amp; debit notes — reduces inventory on posting
           </p>
         </div>
         <div className="flex gap-2">
@@ -536,14 +609,36 @@ export default function DebitNotesPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Info banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+              <strong>How to use:</strong> Select the supplier, then optionally
+              pick the original purchase to auto-fill return items. Adjust
+              quantities and prices as needed before saving.
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
+              {/* Supplier dropdown */}
               <div>
                 <Label>Supplier *</Label>
                 <Select
                   value={form.supplierId}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, supplierId: v }))
-                  }
+                  onValueChange={(v) => {
+                    setForm((f) => ({
+                      ...f,
+                      supplierId: v,
+                      purchaseRef: "",
+                      items: [
+                        {
+                          itemId: "",
+                          itemName: "",
+                          qty: 1,
+                          price: 0,
+                          subtotal: 0,
+                        },
+                      ],
+                    }));
+                    setPurchasePickerOpen(false);
+                  }}
                 >
                   <SelectTrigger data-ocid="debit_notes.select">
                     <SelectValue placeholder="Select supplier" />
@@ -557,6 +652,8 @@ export default function DebitNotesPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Date */}
               <div>
                 <Label>Date *</Label>
                 <Input
@@ -568,29 +665,118 @@ export default function DebitNotesPage() {
                   data-ocid="debit_notes.input"
                 />
               </div>
-              <div>
-                <Label>Original Purchase Reference</Label>
-                <Input
-                  value={form.purchaseRef}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, purchaseRef: e.target.value }))
-                  }
-                  placeholder="e.g. PO-2026-001"
-                  data-ocid="debit_notes.input"
-                />
+
+              {/* Original Purchase — searchable combobox */}
+              <div className="col-span-2">
+                <Label>Original Purchase (optional)</Label>
+                <p className="text-xs text-muted-foreground mb-1.5">
+                  Select a purchase to auto-fill return items. Leave blank to
+                  add items manually.
+                </p>
+                <Popover
+                  open={purchasePickerOpen}
+                  onOpenChange={setPurchasePickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      aria-expanded={purchasePickerOpen}
+                      className="w-full justify-between font-normal"
+                      data-ocid="debit_notes.select"
+                    >
+                      {form.purchaseRef
+                        ? (() => {
+                            const p = supplierPurchases.find(
+                              (x) => x.id === form.purchaseRef,
+                            );
+                            return p
+                              ? `${p.id} — ${p.date || p.createdAt?.slice(0, 10) || ""}`
+                              : form.purchaseRef;
+                          })()
+                        : form.supplierId
+                          ? "Search purchases for this supplier..."
+                          : "Select a supplier first"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[480px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search by purchase ID or date..." />
+                      <CommandList>
+                        <CommandEmpty>
+                          {form.supplierId
+                            ? "No purchases found for this supplier."
+                            : "Please select a supplier first."}
+                        </CommandEmpty>
+                        <CommandGroup heading="Available Purchases">
+                          {supplierPurchases.map((p) => (
+                            <CommandItem
+                              key={p.id}
+                              value={`${p.id} ${p.date || ""} ${p.supplierName || ""}`}
+                              onSelect={() => onSelectPurchase(p)}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${form.purchaseRef === p.id ? "opacity-100" : "opacity-0"}`}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{p.id}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {p.date || p.createdAt?.slice(0, 10)} &bull;{" "}
+                                  {p.supplierName} &bull;{" "}
+                                  {(
+                                    p.total ||
+                                    p.totalAmount ||
+                                    0
+                                  ).toLocaleString()}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {form.purchaseRef && (
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 underline mt-1"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        purchaseRef: "",
+                        items: [
+                          {
+                            itemId: "",
+                            itemName: "",
+                            qty: 1,
+                            price: 0,
+                            subtotal: 0,
+                          },
+                        ],
+                      }))
+                    }
+                  >
+                    Clear selection
+                  </button>
+                )}
               </div>
-              <div>
+
+              {/* Reason */}
+              <div className="col-span-2">
                 <Label>Reason *</Label>
                 <Input
                   value={form.reason}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, reason: e.target.value }))
                   }
-                  placeholder="Reason for return"
+                  placeholder="e.g. Damaged goods, Wrong item received"
                   data-ocid="debit_notes.input"
                 />
               </div>
             </div>
+
+            {/* Return Items */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <Label>Return Items</Label>
@@ -599,88 +785,146 @@ export default function DebitNotesPage() {
                   Add Item
                 </Button>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Subtotal</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {form.items.map((item, idx) => (
-                    <TableRow key={`${item.itemId}-${String(idx)}`}>
-                      <TableCell>
-                        <Select
-                          value={item.itemId}
-                          onValueChange={(v) =>
-                            updateFormItem(idx, "itemId", v)
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {items.map((it) => (
-                              <SelectItem key={it.id} value={it.id}>
-                                {it.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.qty}
-                          min={1}
-                          onChange={(e) =>
-                            updateFormItem(idx, "qty", Number(e.target.value))
-                          }
-                          className="w-20"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.price}
-                          min={0}
-                          onChange={(e) =>
-                            updateFormItem(idx, "price", Number(e.target.value))
-                          }
-                          className="w-24"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {item.subtotal.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600"
-                          onClick={() => removeFormItem(idx)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Subtotal</TableHead>
+                      <TableHead />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="text-right mt-2 font-bold text-lg">
-                Total: {totalAmount.toLocaleString()}
+                  </TableHeader>
+                  <TableBody>
+                    {form.items.map((item, idx) => (
+                      <TableRow key={`item-row-${String(idx)}`}>
+                        <TableCell className="min-w-[200px]">
+                          {/* Searchable item picker */}
+                          <Popover
+                            open={itemPickerOpen[idx] ?? false}
+                            onOpenChange={(open) =>
+                              setItemPickerOpen((prev) => ({
+                                ...prev,
+                                [idx]: open,
+                              }))
+                            }
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between font-normal text-left"
+                              >
+                                <span className="truncate">
+                                  {item.itemId
+                                    ? items.find((it) => it.id === item.itemId)
+                                        ?.name || item.itemName
+                                    : "Select item..."}
+                                </span>
+                                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search items..." />
+                                <CommandList>
+                                  <CommandEmpty>No items found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {items.map((it) => (
+                                      <CommandItem
+                                        key={it.id}
+                                        value={`${it.name} ${it.sku || ""}`}
+                                        onSelect={() => {
+                                          updateFormItem(idx, "itemId", it.id);
+                                          setItemPickerOpen((prev) => ({
+                                            ...prev,
+                                            [idx]: false,
+                                          }));
+                                        }}
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${item.itemId === it.id ? "opacity-100" : "opacity-0"}`}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span>{it.name}</span>
+                                          {it.sku && (
+                                            <span className="text-xs text-muted-foreground font-mono">
+                                              {it.sku}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.qty}
+                            min={1}
+                            onChange={(e) =>
+                              updateFormItem(idx, "qty", Number(e.target.value))
+                            }
+                            className="w-20"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.price}
+                            min={0}
+                            onChange={(e) =>
+                              updateFormItem(
+                                idx,
+                                "price",
+                                Number(e.target.value),
+                              )
+                            }
+                            className="w-24"
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.subtotal.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600"
+                            onClick={() => removeFormItem(idx)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end mt-3">
+                <div className="bg-gray-50 border rounded-lg px-4 py-2">
+                  <span className="text-sm text-gray-600 mr-3">
+                    Total Return Amount:
+                  </span>
+                  <span className="font-bold text-lg">
+                    {totalAmount.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
+
             {editingNote && (
               <p className="text-xs text-gray-500">
                 Created by {editingNote.createdBy} on{" "}
                 {new Date(editingNote.createdAt).toLocaleString()}
               </p>
             )}
-            <div className="flex gap-2 justify-end pt-2">
+
+            <div className="flex gap-2 justify-end pt-2 border-t">
               <Button
                 variant="outline"
                 onClick={() => setDialogOpen(false)}

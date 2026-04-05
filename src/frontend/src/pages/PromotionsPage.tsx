@@ -14,6 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -22,6 +30,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -39,6 +52,8 @@ import {
 } from "@/components/ui/table";
 import {
   CalendarRange,
+  Check,
+  ChevronsUpDown,
   Edit,
   FileDown,
   FileText,
@@ -46,6 +61,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -95,14 +111,20 @@ const EMPTY_FORM = {
   startDate: "",
   endDate: "",
   applicableTo: "all" as Promotion["applicableTo"],
-  categories: "",
+  categoryIds: [] as string[],
   productIds: [] as string[],
   status: "Active" as Promotion["status"],
 };
 
 export default function PromotionsPage() {
-  const { promotions, items, addPromotion, updatePromotion, deletePromotion } =
-    useStore();
+  const {
+    promotions,
+    items,
+    itemCategories,
+    addPromotion,
+    updatePromotion,
+    deletePromotion,
+  } = useStore();
   const { currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -110,6 +132,7 @@ export default function PromotionsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Promotion | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   const filtered = promotions.filter((p) => {
     const ms = p.name.toLowerCase().includes(search.toLowerCase());
@@ -127,20 +150,31 @@ export default function PromotionsPage() {
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
+
   const openEdit = (p: Promotion) => {
     setEditing(p);
+    const matchedIds = p.categories
+      .map((cName) => {
+        const found = itemCategories.find(
+          (ic) => ic.name === cName || ic.id === cName,
+        );
+        return found ? found.id : null;
+      })
+      .filter(Boolean) as string[];
     setForm({
       name: p.name,
       discountPercentage: p.discountPercentage.toString(),
       startDate: p.startDate,
       endDate: p.endDate,
       applicableTo: p.applicableTo,
-      categories: p.categories.join(", "),
+      categoryIds: matchedIds,
       productIds: p.productIds,
       status: p.status,
     });
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
@@ -158,16 +192,16 @@ export default function PromotionsPage() {
       toast.error("Start date must be before end date");
       return;
     }
+    const categoryNames = form.categoryIds
+      .map((id) => itemCategories.find((ic) => ic.id === id)?.name)
+      .filter(Boolean) as string[];
     const data: Omit<Promotion, "id"> = {
       name: form.name,
       discountPercentage: Number.parseFloat(form.discountPercentage) || 0,
       startDate: form.startDate,
       endDate: form.endDate,
       applicableTo: form.applicableTo,
-      categories: form.categories
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean),
+      categories: categoryNames,
       productIds: form.productIds,
       status: form.status,
     };
@@ -179,6 +213,15 @@ export default function PromotionsPage() {
       toast.success("Promotion created");
     }
     setDialogOpen(false);
+  };
+
+  const toggleCategory = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(id)
+        ? prev.categoryIds.filter((c) => c !== id)
+        : [...prev.categoryIds, id],
+    }));
   };
 
   const toggleProduct = (id: string) => {
@@ -503,6 +546,8 @@ export default function PromotionsPage() {
                   setForm({
                     ...form,
                     applicableTo: v as Promotion["applicableTo"],
+                    categoryIds: [],
+                    productIds: [],
                   })
                 }
               >
@@ -516,19 +561,89 @@ export default function PromotionsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Category multi-select */}
             {form.applicableTo === "category" && (
               <div className="space-y-2">
-                <Label>Categories (comma-separated)</Label>
-                <Input
-                  value={form.categories}
-                  onChange={(e) =>
-                    setForm({ ...form, categories: e.target.value })
-                  }
-                  placeholder="Electronics, Food"
-                  data-ocid="promotions.input"
-                />
+                <Label>Categories</Label>
+                <p className="text-xs text-muted-foreground">
+                  Search and select one or more categories this promotion
+                  applies to.
+                </p>
+                <Popover
+                  open={categoryPickerOpen}
+                  onOpenChange={setCategoryPickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      data-ocid="promotions.select"
+                    >
+                      {form.categoryIds.length === 0
+                        ? "Select categories..."
+                        : `${form.categoryIds.length} categor${form.categoryIds.length === 1 ? "y" : "ies"} selected`}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search categories..." />
+                      <CommandList>
+                        <CommandEmpty>No categories found.</CommandEmpty>
+                        <CommandGroup>
+                          {itemCategories
+                            .filter((c) => c.status === "active")
+                            .map((cat) => (
+                              <CommandItem
+                                key={cat.id}
+                                value={cat.name}
+                                onSelect={() => toggleCategory(cat.id)}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    form.categoryIds.includes(cat.id)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+                                {cat.name}
+                                <span className="ml-auto text-xs text-muted-foreground font-mono">
+                                  {cat.code}
+                                </span>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {form.categoryIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {form.categoryIds.map((id) => {
+                      const cat = itemCategories.find((c) => c.id === id);
+                      return cat ? (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="gap-1 pr-1"
+                        >
+                          {cat.name}
+                          <button
+                            type="button"
+                            onClick={() => toggleCategory(id)}
+                            className="ml-1 rounded-full hover:bg-gray-300"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
             {form.applicableTo === "product" && (
               <div className="space-y-2">
                 <Label>Select Products</Label>

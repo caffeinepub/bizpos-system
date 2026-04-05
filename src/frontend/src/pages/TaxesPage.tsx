@@ -14,6 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -22,6 +30,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -38,6 +51,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Check,
+  ChevronsUpDown,
   Edit,
   FileDown,
   FileText,
@@ -45,6 +60,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -61,13 +77,20 @@ const EMPTY_FORM = {
   name: "",
   rate: "",
   applicableTo: "all" as TaxRate["applicableTo"],
-  categories: "",
+  categoryIds: [] as string[],
   productIds: [] as string[],
   status: "Active" as TaxRate["status"],
 };
 
 export default function TaxesPage() {
-  const { taxes, items, addTaxRate, updateTaxRate, deleteTaxRate } = useStore();
+  const {
+    taxes,
+    items,
+    itemCategories,
+    addTaxRate,
+    updateTaxRate,
+    deleteTaxRate,
+  } = useStore();
   const { currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -76,6 +99,7 @@ export default function TaxesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<TaxRate | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   const filtered = taxes.filter((t) => {
     const ms = t.name.toLowerCase().includes(search.toLowerCase());
@@ -93,19 +117,31 @@ export default function TaxesPage() {
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
   const openEdit = (t: TaxRate) => {
     setEditing(t);
+    // categories in the store are category names; try to match by name to get IDs
+    const matchedIds = t.categories
+      .map((cName) => {
+        const found = itemCategories.find(
+          (ic) => ic.name === cName || ic.id === cName,
+        );
+        return found ? found.id : null;
+      })
+      .filter(Boolean) as string[];
     setForm({
       name: t.name,
       rate: t.rate.toString(),
       applicableTo: t.applicableTo,
-      categories: t.categories.join(", "),
+      categoryIds:
+        matchedIds.length > 0 ? matchedIds : t.categories.length > 0 ? [] : [],
       productIds: t.productIds,
       status: t.status,
     });
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
@@ -114,14 +150,15 @@ export default function TaxesPage() {
       toast.error("Name and Rate are required");
       return;
     }
+    // Store categories as names for backward compatibility
+    const categoryNames = form.categoryIds
+      .map((id) => itemCategories.find((ic) => ic.id === id)?.name)
+      .filter(Boolean) as string[];
     const data: Omit<TaxRate, "id"> = {
       name: form.name,
       rate: Number.parseFloat(form.rate) || 0,
       applicableTo: form.applicableTo,
-      categories: form.categories
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean),
+      categories: categoryNames,
       productIds: form.productIds,
       status: form.status,
     };
@@ -133,6 +170,15 @@ export default function TaxesPage() {
       toast.success("Tax rate created");
     }
     setDialogOpen(false);
+  };
+
+  const toggleCategory = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(id)
+        ? prev.categoryIds.filter((c) => c !== id)
+        : [...prev.categoryIds, id],
+    }));
   };
 
   const toggleProduct = (id: string) => {
@@ -266,7 +312,6 @@ export default function TaxesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="all">All Products</SelectItem>
                 <SelectItem value="category">By Category</SelectItem>
                 <SelectItem value="product">By Product</SelectItem>
               </SelectContent>
@@ -424,6 +469,8 @@ export default function TaxesPage() {
                   setForm({
                     ...form,
                     applicableTo: v as TaxRate["applicableTo"],
+                    categoryIds: [],
+                    productIds: [],
                   })
                 }
               >
@@ -437,19 +484,89 @@ export default function TaxesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Category multi-select */}
             {form.applicableTo === "category" && (
               <div className="space-y-2">
-                <Label>Categories (comma-separated)</Label>
-                <Input
-                  value={form.categories}
-                  onChange={(e) =>
-                    setForm({ ...form, categories: e.target.value })
-                  }
-                  placeholder="Electronics, Food, Services"
-                  data-ocid="taxes.input"
-                />
+                <Label>Categories</Label>
+                <p className="text-xs text-muted-foreground">
+                  Search and select one or more categories this tax applies to.
+                </p>
+                <Popover
+                  open={categoryPickerOpen}
+                  onOpenChange={setCategoryPickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      data-ocid="taxes.select"
+                    >
+                      {form.categoryIds.length === 0
+                        ? "Select categories..."
+                        : `${form.categoryIds.length} categor${form.categoryIds.length === 1 ? "y" : "ies"} selected`}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search categories..." />
+                      <CommandList>
+                        <CommandEmpty>No categories found.</CommandEmpty>
+                        <CommandGroup>
+                          {itemCategories
+                            .filter((c) => c.status === "active")
+                            .map((cat) => (
+                              <CommandItem
+                                key={cat.id}
+                                value={cat.name}
+                                onSelect={() => toggleCategory(cat.id)}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    form.categoryIds.includes(cat.id)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+                                {cat.name}
+                                <span className="ml-auto text-xs text-muted-foreground font-mono">
+                                  {cat.code}
+                                </span>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {/* Selected categories as chips */}
+                {form.categoryIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {form.categoryIds.map((id) => {
+                      const cat = itemCategories.find((c) => c.id === id);
+                      return cat ? (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="gap-1 pr-1"
+                        >
+                          {cat.name}
+                          <button
+                            type="button"
+                            onClick={() => toggleCategory(id)}
+                            className="ml-1 rounded-full hover:bg-gray-300"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
             {form.applicableTo === "product" && (
               <div className="space-y-2">
                 <Label>Select Products</Label>

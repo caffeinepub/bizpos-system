@@ -14,6 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -22,6 +30,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -38,6 +51,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Check,
+  ChevronsUpDown,
   Edit,
   FileDown,
   FileText,
@@ -45,6 +60,7 @@ import {
   Search,
   Tag,
   Trash2,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -61,14 +77,20 @@ const EMPTY_FORM = {
   name: "",
   percentage: "",
   applicableTo: "all" as Discount["applicableTo"],
-  categories: "",
+  categoryIds: [] as string[],
   productIds: [] as string[],
   status: "Active" as Discount["status"],
 };
 
 export default function DiscountsPage() {
-  const { discounts, items, addDiscount, updateDiscount, deleteDiscount } =
-    useStore();
+  const {
+    discounts,
+    items,
+    itemCategories,
+    addDiscount,
+    updateDiscount,
+    deleteDiscount,
+  } = useStore();
   const { currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -76,6 +98,7 @@ export default function DiscountsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Discount | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
 
   const filtered = discounts.filter((d) => {
     const ms = d.name.toLowerCase().includes(search.toLowerCase());
@@ -91,18 +114,30 @@ export default function DiscountsPage() {
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
+
   const openEdit = (d: Discount) => {
     setEditing(d);
+    // Match category names to IDs
+    const matchedIds = d.categories
+      .map((cName) => {
+        const found = itemCategories.find(
+          (ic) => ic.name === cName || ic.id === cName,
+        );
+        return found ? found.id : null;
+      })
+      .filter(Boolean) as string[];
     setForm({
       name: d.name,
       percentage: d.percentage.toString(),
       applicableTo: d.applicableTo,
-      categories: d.categories.join(", "),
+      categoryIds: matchedIds,
       productIds: d.productIds,
       status: d.status,
     });
+    setCategoryPickerOpen(false);
     setDialogOpen(true);
   };
 
@@ -111,14 +146,14 @@ export default function DiscountsPage() {
       toast.error("Name and Percentage are required");
       return;
     }
+    const categoryNames = form.categoryIds
+      .map((id) => itemCategories.find((ic) => ic.id === id)?.name)
+      .filter(Boolean) as string[];
     const data: Omit<Discount, "id"> = {
       name: form.name,
       percentage: Number.parseFloat(form.percentage) || 0,
       applicableTo: form.applicableTo,
-      categories: form.categories
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean),
+      categories: categoryNames,
       productIds: form.productIds,
       status: form.status,
     };
@@ -130,6 +165,15 @@ export default function DiscountsPage() {
       toast.success("Discount created");
     }
     setDialogOpen(false);
+  };
+
+  const toggleCategory = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(id)
+        ? prev.categoryIds.filter((c) => c !== id)
+        : [...prev.categoryIds, id],
+    }));
   };
 
   const toggleProduct = (id: string) => {
@@ -409,6 +453,8 @@ export default function DiscountsPage() {
                   setForm({
                     ...form,
                     applicableTo: v as Discount["applicableTo"],
+                    categoryIds: [],
+                    productIds: [],
                   })
                 }
               >
@@ -422,19 +468,89 @@ export default function DiscountsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Category multi-select */}
             {form.applicableTo === "category" && (
               <div className="space-y-2">
-                <Label>Categories (comma-separated)</Label>
-                <Input
-                  value={form.categories}
-                  onChange={(e) =>
-                    setForm({ ...form, categories: e.target.value })
-                  }
-                  placeholder="Electronics, Food"
-                  data-ocid="discounts.input"
-                />
+                <Label>Categories</Label>
+                <p className="text-xs text-muted-foreground">
+                  Search and select one or more categories this discount applies
+                  to.
+                </p>
+                <Popover
+                  open={categoryPickerOpen}
+                  onOpenChange={setCategoryPickerOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      data-ocid="discounts.select"
+                    >
+                      {form.categoryIds.length === 0
+                        ? "Select categories..."
+                        : `${form.categoryIds.length} categor${form.categoryIds.length === 1 ? "y" : "ies"} selected`}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search categories..." />
+                      <CommandList>
+                        <CommandEmpty>No categories found.</CommandEmpty>
+                        <CommandGroup>
+                          {itemCategories
+                            .filter((c) => c.status === "active")
+                            .map((cat) => (
+                              <CommandItem
+                                key={cat.id}
+                                value={cat.name}
+                                onSelect={() => toggleCategory(cat.id)}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    form.categoryIds.includes(cat.id)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+                                {cat.name}
+                                <span className="ml-auto text-xs text-muted-foreground font-mono">
+                                  {cat.code}
+                                </span>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {form.categoryIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {form.categoryIds.map((id) => {
+                      const cat = itemCategories.find((c) => c.id === id);
+                      return cat ? (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="gap-1 pr-1"
+                        >
+                          {cat.name}
+                          <button
+                            type="button"
+                            onClick={() => toggleCategory(id)}
+                            className="ml-1 rounded-full hover:bg-gray-300"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
             )}
+
             {form.applicableTo === "product" && (
               <div className="space-y-2">
                 <Label>Select Products</Label>
