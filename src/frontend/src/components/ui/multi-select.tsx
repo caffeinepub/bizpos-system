@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 
 export interface MultiSelectOption {
@@ -30,6 +30,8 @@ export function MultiSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const uid = useId();
+  const portalId = `multiselect-portal-${uid}`;
 
   const filtered = options.filter(
     (opt) =>
@@ -50,34 +52,50 @@ export function MultiSelect({
     onChange(value.filter((v) => v !== optValue));
   };
 
-  // Position the portal dropdown under the trigger
-  useLayoutEffect(() => {
-    if (open && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      const dropdownHeight = 220;
+  const calcAndSetPos = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const dropdownHeight = 240;
 
-      if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-        setDropdownStyle({
-          position: "fixed",
-          top: rect.bottom + 4,
-          left: rect.left,
-          width: rect.width,
-          zIndex: 9999,
-          maxHeight: Math.min(dropdownHeight, spaceBelow - 8),
-        });
-      } else {
-        setDropdownStyle({
-          position: "fixed",
-          bottom: window.innerHeight - rect.top + 4,
-          left: rect.left,
-          width: rect.width,
-          zIndex: 9999,
-          maxHeight: Math.min(dropdownHeight, spaceAbove - 8),
-        });
-      }
+    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceBelow - 8)),
+      });
+    } else {
+      setDropdownStyle({
+        position: "fixed",
+        bottom: window.innerHeight - rect.top + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceAbove - 8)),
+      });
     }
+  };
+
+  // Position the portal dropdown under the trigger
+  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
+  useLayoutEffect(() => {
+    if (open) calcAndSetPos();
+  }, [open]);
+
+  // Reposition on scroll/resize
+  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("scroll", calcAndSetPos, true);
+    window.addEventListener("resize", calcAndSetPos);
+    return () => {
+      window.removeEventListener("scroll", calcAndSetPos, true);
+      window.removeEventListener("resize", calcAndSetPos);
+    };
   }, [open]);
 
   // Close on outside click
@@ -87,7 +105,7 @@ export function MultiSelect({
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        const portal = document.getElementById("multiselect-portal");
+        const portal = document.getElementById(portalId);
         if (portal?.contains(e.target as Node)) return;
         setOpen(false);
         setInputValue("");
@@ -95,7 +113,7 @@ export function MultiSelect({
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [portalId]);
 
   const selectedOptions = value
     .map((v) => options.find((o) => o.value === v))
@@ -104,13 +122,13 @@ export function MultiSelect({
   const openDropdown = () => {
     if (!disabled) {
       setOpen(true);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
   const dropdownContent = open && !disabled && (
     <div
-      id="multiselect-portal"
+      id={portalId}
       style={dropdownStyle}
       className="bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto"
     >
@@ -264,6 +282,8 @@ export function SingleSearchSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const uid = useId();
+  const portalId = `singlesearch-portal-${uid}`;
 
   const selectedOption = options.find((o) => o.value === value);
 
@@ -279,7 +299,7 @@ export function SingleSearchSelect({
     const rect = containerRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const dropdownHeight = 220;
+    const dropdownHeight = 240;
 
     if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
       setDropdownStyle({
@@ -288,7 +308,7 @@ export function SingleSearchSelect({
         left: rect.left,
         width: rect.width,
         zIndex: 9999,
-        maxHeight: Math.min(dropdownHeight, spaceBelow - 8),
+        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceBelow - 8)),
       });
     } else {
       setDropdownStyle({
@@ -297,7 +317,7 @@ export function SingleSearchSelect({
         left: rect.left,
         width: rect.width,
         zIndex: 9999,
-        maxHeight: Math.min(dropdownHeight, spaceAbove - 8),
+        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceAbove - 8)),
       });
     }
   };
@@ -325,7 +345,7 @@ export function SingleSearchSelect({
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        const portal = document.getElementById("singlesearch-portal");
+        const portal = document.getElementById(portalId);
         if (portal?.contains(e.target as Node)) return;
         setOpen(false);
         setInputValue("");
@@ -333,7 +353,7 @@ export function SingleSearchSelect({
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [portalId]);
 
   const handleSelect = (optValue: string) => {
     onChange(optValue);
@@ -351,13 +371,13 @@ export function SingleSearchSelect({
   const openDropdown = () => {
     if (!disabled) {
       setOpen(true);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
   const dropdownContent = open && !disabled && (
     <div
-      id="singlesearch-portal"
+      id={portalId}
       style={dropdownStyle}
       className="bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto"
     >
@@ -406,7 +426,7 @@ export function SingleSearchSelect({
         }}
       >
         {selectedOption && !open ? (
-          <span className="flex-1 text-sm text-gray-900 truncate">
+          <span className="flex-1 text-sm text-gray-900 min-w-0 break-words">
             {selectedOption.label}
           </span>
         ) : (
