@@ -208,4 +208,26 @@ body[data-tooltips="false"] [title] {
   [data-print="hide"] {
     display: none !important;
   }
+  /* ---- Receipt-only print mode ----
+     When body.printing-receipt, hide everything except the receipt dialog */
+  body.printing-receipt > * {
+    display: none !important;
+  }
+  body.printing-receipt [data-ocid="pos.modal"],
+  body.printing-receipt [data-radix-portal] [data-ocid="pos.modal"] {
+    display: block !important;
+    position: static !important;
+    transform: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 16px !important;
+  }
+  /* Make the radix portal visible when receipt printing */
+  body.printing-receipt [data-radix-portal] {
+    display: block !important;
+  }
 }

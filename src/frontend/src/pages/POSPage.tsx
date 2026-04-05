@@ -158,6 +158,7 @@ export default function POSPage() {
   const [noShopWarning, setNoShopWarning] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
+  const receiptContentRef = useRef<HTMLDivElement>(null);
   const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
   const [heldDialogOpen, setHeldDialogOpen] = useState(false);
   const initialized = useRef(false);
@@ -667,7 +668,7 @@ export default function POSPage() {
             <DialogTitle>Sale Completed — Receipt</DialogTitle>
           </DialogHeader>
           {lastSale && (
-            <div className="space-y-4">
+            <div className="space-y-4" ref={receiptContentRef}>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="text-gray-500">Sale ID:</span>{" "}
@@ -764,7 +765,30 @@ export default function POSPage() {
               >
                 <Button
                   variant="outline"
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    const receiptEl = receiptContentRef.current;
+                    if (!receiptEl) return;
+                    const printWin = window.open(
+                      "",
+                      "_blank",
+                      "width=400,height=600",
+                    );
+                    if (!printWin) {
+                      window.print();
+                      return;
+                    }
+                    printWin.document.write(
+                      "<html><head><title>Receipt</title><style>body{font-family:sans-serif;font-size:12pt;margin:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4pt 6pt;text-align:left}th{background:#f5f5f5}.text-right{text-align:right}.font-bold{font-weight:bold}.border-t{border-top:2px solid #333;margin-top:8px;padding-top:8px}.text-primary{color:#2563eb}.text-gray-500{color:#666}.text-red-600{color:#dc2626}.text-green-600{color:#16a34a}.text-orange-600{color:#ea580c}.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}.col-span-2{grid-column:span 2}.space-y{margin-bottom:6px}.flex-between{display:flex;justify-content:space-between}</style></head><body>",
+                    );
+                    printWin.document.write(receiptEl.innerHTML);
+                    printWin.document.write("</body></html>");
+                    printWin.document.close();
+                    printWin.focus();
+                    setTimeout(() => {
+                      printWin.print();
+                      printWin.close();
+                    }, 300);
+                  }}
                   className="flex-1"
                   data-ocid="pos.secondary_button"
                 >

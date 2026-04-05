@@ -2019,16 +2019,6 @@ function createSeedData() {
       groupName: "Retail",
       createdAt: "2024-01-12T00:00:00Z",
     },
-    {
-      id: "cust-003",
-      name: "Walk-in Customer",
-      phone: "-",
-      email: "",
-      address: "-",
-      groupId: "cg3",
-      groupName: "VIP",
-      createdAt: "2024-01-01T00:00:00Z",
-    },
   ];
 
   const paymentModes: PaymentMode[] = [
