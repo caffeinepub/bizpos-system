@@ -1,6 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
+import { useEffect, useRef, useState } from "react";
 
 export interface MultiSelectOption {
   value: string;
@@ -29,9 +28,6 @@ export function MultiSelect({
   const [inputValue, setInputValue] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const uid = useId();
-  const portalId = `multiselect-portal-${uid}`;
 
   const filtered = options.filter(
     (opt) =>
@@ -52,52 +48,6 @@ export function MultiSelect({
     onChange(value.filter((v) => v !== optValue));
   };
 
-  const calcAndSetPos = () => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const dropdownHeight = 240;
-
-    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-      setDropdownStyle({
-        position: "fixed",
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-        zIndex: 9999,
-        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceBelow - 8)),
-      });
-    } else {
-      setDropdownStyle({
-        position: "fixed",
-        bottom: window.innerHeight - rect.top + 4,
-        left: rect.left,
-        width: rect.width,
-        zIndex: 9999,
-        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceAbove - 8)),
-      });
-    }
-  };
-
-  // Position the portal dropdown under the trigger
-  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
-  useLayoutEffect(() => {
-    if (open) calcAndSetPos();
-  }, [open]);
-
-  // Reposition on scroll/resize
-  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("scroll", calcAndSetPos, true);
-    window.addEventListener("resize", calcAndSetPos);
-    return () => {
-      window.removeEventListener("scroll", calcAndSetPos, true);
-      window.removeEventListener("resize", calcAndSetPos);
-    };
-  }, [open]);
-
   // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -105,15 +55,13 @@ export function MultiSelect({
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        const portal = document.getElementById(portalId);
-        if (portal?.contains(e.target as Node)) return;
         setOpen(false);
         setInputValue("");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [portalId]);
+  }, []);
 
   const selectedOptions = value
     .map((v) => options.find((o) => o.value === v))
@@ -122,76 +70,9 @@ export function MultiSelect({
   const openDropdown = () => {
     if (!disabled) {
       setOpen(true);
-      setTimeout(() => inputRef.current?.focus(), 0);
+      inputRef.current?.focus();
     }
   };
-
-  const dropdownContent = open && !disabled && (
-    <div
-      id={portalId}
-      style={dropdownStyle}
-      className="bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto"
-    >
-      {filtered.length === 0 ? (
-        <div className="py-3 px-3 text-sm text-muted-foreground text-center">
-          No options found.
-        </div>
-      ) : (
-        <div className="py-1">
-          {filtered.map((opt) => {
-            const isSelected = value.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  toggle(opt.value);
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none text-left ${
-                  isSelected
-                    ? "bg-blue-50 text-blue-800"
-                    : "hover:bg-gray-50 text-gray-900"
-                }`}
-              >
-                <span
-                  className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
-                    isSelected
-                      ? "bg-blue-600 border-blue-600"
-                      : "border-gray-300"
-                  }`}
-                >
-                  {isSelected && (
-                    <svg
-                      className="w-3 h-3 text-white"
-                      fill="none"
-                      viewBox="0 0 12 12"
-                      aria-hidden="true"
-                    >
-                      <title>Selected</title>
-                      <path
-                        d="M2 6l3 3 5-5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </span>
-                <span className="flex-1 min-w-0">{opt.label}</span>
-                {opt.meta && (
-                  <span className="flex-shrink-0 text-xs text-muted-foreground font-mono">
-                    {opt.meta}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -244,9 +125,70 @@ export function MultiSelect({
         />
       </div>
 
-      {/* Portal dropdown — escapes any overflow:hidden ancestor */}
-      {typeof document !== "undefined" &&
-        ReactDOM.createPortal(dropdownContent, document.body)}
+      {/* Dropdown */}
+      {open && !disabled && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="py-3 px-3 text-sm text-muted-foreground text-center">
+              No options found.
+            </div>
+          ) : (
+            <div className="py-1">
+              {filtered.map((opt) => {
+                const isSelected = value.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      toggle(opt.value);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none text-left ${
+                      isSelected
+                        ? "bg-blue-50 text-blue-800"
+                        : "hover:bg-gray-50 text-gray-900"
+                    }`}
+                  >
+                    {/* Checkmark box */}
+                    <span
+                      className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
+                        isSelected
+                          ? "bg-blue-600 border-blue-600"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          viewBox="0 0 12 12"
+                          aria-hidden="true"
+                        >
+                          <title>Selected</title>
+                          <path
+                            d="M2 6l3 3 5-5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="flex-1 min-w-0">{opt.label}</span>
+                    {opt.meta && (
+                      <span className="flex-shrink-0 text-xs text-muted-foreground font-mono">
+                        {opt.meta}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -281,9 +223,6 @@ export function SingleSearchSelect({
   const [inputValue, setInputValue] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const uid = useId();
-  const portalId = `singlesearch-portal-${uid}`;
 
   const selectedOption = options.find((o) => o.value === value);
 
@@ -293,67 +232,19 @@ export function SingleSearchSelect({
       opt.description?.toLowerCase().includes(inputValue.toLowerCase()),
   );
 
-  // Position portal dropdown under (or above) the trigger
-  const calcAndSetPos = () => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const dropdownHeight = 240;
-
-    if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-      setDropdownStyle({
-        position: "fixed",
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-        zIndex: 9999,
-        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceBelow - 8)),
-      });
-    } else {
-      setDropdownStyle({
-        position: "fixed",
-        bottom: window.innerHeight - rect.top + 4,
-        left: rect.left,
-        width: rect.width,
-        zIndex: 9999,
-        maxHeight: Math.max(120, Math.min(dropdownHeight, spaceAbove - 8)),
-      });
-    }
-  };
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
-  useLayoutEffect(() => {
-    if (open) calcAndSetPos();
-  }, [open]);
-
-  // Reposition on scroll/resize so dropdown follows trigger inside scrollable modals
-  // biome-ignore lint/correctness/useExhaustiveDependencies: calcAndSetPos is stable
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("scroll", calcAndSetPos, true);
-    window.addEventListener("resize", calcAndSetPos);
-    return () => {
-      window.removeEventListener("scroll", calcAndSetPos, true);
-      window.removeEventListener("resize", calcAndSetPos);
-    };
-  }, [open]);
-
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
-        const portal = document.getElementById(portalId);
-        if (portal?.contains(e.target as Node)) return;
         setOpen(false);
         setInputValue("");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [portalId]);
+  }, []);
 
   const handleSelect = (optValue: string) => {
     onChange(optValue);
@@ -371,46 +262,9 @@ export function SingleSearchSelect({
   const openDropdown = () => {
     if (!disabled) {
       setOpen(true);
-      setTimeout(() => inputRef.current?.focus(), 0);
+      inputRef.current?.focus();
     }
   };
-
-  const dropdownContent = open && !disabled && (
-    <div
-      id={portalId}
-      style={dropdownStyle}
-      className="bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto"
-    >
-      {filtered.length === 0 ? (
-        <div className="py-3 px-3 text-sm text-muted-foreground text-center">
-          {emptyMessage}
-        </div>
-      ) : (
-        <div className="py-1">
-          {filtered.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelect(opt.value);
-              }}
-              className={`w-full flex flex-col px-3 py-2 text-sm cursor-pointer select-none text-left hover:bg-gray-50 ${
-                value === opt.value ? "bg-blue-50" : ""
-              }`}
-            >
-              <span className="font-medium text-gray-900">{opt.label}</span>
-              {opt.description && (
-                <span className="text-xs text-muted-foreground mt-0.5">
-                  {opt.description}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -426,7 +280,7 @@ export function SingleSearchSelect({
         }}
       >
         {selectedOption && !open ? (
-          <span className="flex-1 text-sm text-gray-900 min-w-0 break-words">
+          <span className="flex-1 text-sm text-gray-900 truncate">
             {selectedOption.label}
           </span>
         ) : (
@@ -458,9 +312,38 @@ export function SingleSearchSelect({
         )}
       </div>
 
-      {/* Portal dropdown — escapes any overflow:hidden ancestor */}
-      {typeof document !== "undefined" &&
-        ReactDOM.createPortal(dropdownContent, document.body)}
+      {open && !disabled && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="py-3 px-3 text-sm text-muted-foreground text-center">
+              {emptyMessage}
+            </div>
+          ) : (
+            <div className="py-1">
+              {filtered.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(opt.value);
+                  }}
+                  className={`w-full flex flex-col px-3 py-2 text-sm cursor-pointer select-none text-left hover:bg-gray-50 ${
+                    value === opt.value ? "bg-blue-50" : ""
+                  }`}
+                >
+                  <span className="font-medium text-gray-900">{opt.label}</span>
+                  {opt.description && (
+                    <span className="text-xs text-muted-foreground mt-0.5">
+                      {opt.description}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

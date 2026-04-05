@@ -73,13 +73,7 @@ interface SaleRecord {
   createdAt?: string;
   customerId?: string;
   customerName?: string;
-  items?: {
-    itemId: string;
-    itemName: string;
-    qty?: number;
-    quantity?: number;
-    price: number;
-  }[];
+  items?: { itemId: string; itemName: string; qty: number; price: number }[];
   total?: number;
 }
 
@@ -167,17 +161,13 @@ export default function CreditNotesPage() {
 
   // When a sale is selected, auto-populate items
   const onSelectSale = (sale: SaleRecord) => {
-    const saleItems = (sale.items || []).map((si) => {
-      const qty = Number(si.quantity ?? si.qty ?? 1) || 1;
-      const price = Number(si.price) || 0;
-      return {
-        itemId: si.itemId,
-        itemName: si.itemName,
-        qty,
-        price,
-        subtotal: qty * price,
-      };
-    });
+    const saleItems = (sale.items || []).map((si) => ({
+      itemId: si.itemId,
+      itemName: si.itemName,
+      qty: si.qty,
+      price: si.price,
+      subtotal: si.qty * si.price,
+    }));
     setForm((f) => ({
       ...f,
       saleRef: sale.id,
@@ -213,11 +203,10 @@ export default function CreditNotesPage() {
           const found = items.find((it) => it.id === value);
           newItem.itemName = found ? found.name : "";
           newItem.price = found ? found.salePrice : 0;
-          newItem.subtotal = (newItem.qty || 0) * (newItem.price || 0);
+          newItem.subtotal = newItem.qty * newItem.price;
         } else if (field === "qty" || field === "price") {
-          const qty = field === "qty" ? Number(value) || 0 : newItem.qty || 0;
-          const price =
-            field === "price" ? Number(value) || 0 : newItem.price || 0;
+          const qty = field === "qty" ? Number(value) : newItem.qty;
+          const price = field === "price" ? Number(value) : newItem.price;
           newItem.subtotal = qty * price;
         }
         return newItem;
@@ -226,10 +215,7 @@ export default function CreditNotesPage() {
     });
   };
 
-  const totalAmount = form.items.reduce(
-    (s, i) => s + (Number(i.subtotal) || 0),
-    0,
-  );
+  const totalAmount = form.items.reduce((s, i) => s + i.subtotal, 0);
 
   const handleSave = (status: "Draft" | "Posted") => {
     if (!form.customerId || !form.date || form.items.some((i) => !i.itemId)) {
@@ -727,7 +713,7 @@ export default function CreditNotesPage() {
                   Add Item
                 </Button>
               </div>
-              <div className="border rounded-lg overflow-visible">
+              <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -784,7 +770,7 @@ export default function CreditNotesPage() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          {(Number(item.subtotal) || 0).toLocaleString()}
+                          {item.subtotal.toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Button

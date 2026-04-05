@@ -94,10 +94,9 @@ export default function CustomersPage() {
 
   const filtered = customers.filter(
     (c) =>
-      c.name.toLowerCase() !== "walk-in customer" &&
-      (c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search) ||
-        c.email.toLowerCase().includes(search.toLowerCase())),
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.includes(search) ||
+      c.email.toLowerCase().includes(search.toLowerCase()),
   );
 
   const openAdd = () => {
