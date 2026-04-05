@@ -158,7 +158,6 @@ export default function POSPage() {
   const [noShopWarning, setNoShopWarning] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
-  const receiptContentRef = useRef<HTMLDivElement>(null);
   const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
   const [heldDialogOpen, setHeldDialogOpen] = useState(false);
   const initialized = useRef(false);
@@ -445,6 +444,83 @@ export default function POSPage() {
     toast.success("Held sale removed");
   };
 
+  const printReceiptContent = (sale: LastSale, currency: string) => {
+    const fmt = (n: number) => `${currency} ${n.toFixed(2)}`;
+    const rows = sale.items
+      .map(
+        (it) =>
+          `<tr><td>${it.itemName}</td><td style="text-align:right">${it.quantity}</td><td style="text-align:right">${fmt(it.price)}</td><td style="text-align:right">${fmt(it.subtotal)}</td></tr>`,
+      )
+      .join("");
+    const discountRow =
+      sale.discountAmt > 0
+        ? `<tr><td colspan="3" style="text-align:right;color:#dc2626">Discount</td><td style="text-align:right;color:#dc2626">-${fmt(sale.discountAmt)}</td></tr>`
+        : "";
+    const promoRow =
+      sale.promoSavings > 0
+        ? `<tr><td colspan="3" style="text-align:right;color:#16a34a">Promo Savings</td><td style="text-align:right;color:#16a34a">-${fmt(sale.promoSavings)}</td></tr>`
+        : "";
+    const taxRow =
+      sale.taxAmount > 0
+        ? `<tr><td colspan="3" style="text-align:right;color:#ea580c">Tax</td><td style="text-align:right;color:#ea580c">+${fmt(sale.taxAmount)}</td></tr>`
+        : "";
+    const html = `<!DOCTYPE html><html><head><title>Receipt - ${sale.id}</title><style>
+      body{font-family:Arial,sans-serif;font-size:11pt;margin:20px;color:#111}
+      h2{text-align:center;font-size:14pt;margin:0 0 4px}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin-bottom:12px;font-size:10pt}
+      .meta span{color:#666}
+      table{width:100%;border-collapse:collapse;margin-bottom:8px}
+      th{background:#f0f0f0;padding:5px 8px;text-align:left;border-bottom:2px solid #ccc;font-size:10pt}
+      td{padding:4px 8px;border-bottom:1px solid #eee;font-size:10pt}
+      .totals td{border:none;padding:3px 8px}
+      .total-row td{font-weight:bold;font-size:12pt;border-top:2px solid #333;padding-top:6px}
+      @media print{@page{margin:10mm}}
+    </style></head><body>
+      <h2>Sale Receipt</h2>
+      <p style="text-align:center;color:#666;font-size:10pt;margin:0 0 12px">${sale.id}</p>
+      <div class="meta">
+        <div><span>Date:</span> ${sale.date}</div>
+        <div><span>Cashier:</span> ${sale.cashierName}</div>
+        <div><span>Shop:</span> ${sale.shopName}</div>
+        <div><span>Customer:</span> ${sale.customerName}</div>
+        <div><span>Payment:</span> ${sale.paymentMethod}</div>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Subtotal</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table class="totals">
+        <tbody>
+          <tr><td colspan="3" style="text-align:right">Subtotal</td><td style="text-align:right">${fmt(sale.subtotal)}</td></tr>
+          ${discountRow}${promoRow}${taxRow}
+        </tbody>
+        <tfoot class="total-row"><tr><td colspan="3" style="text-align:right">TOTAL</td><td style="text-align:right;color:#2563eb">${fmt(sale.total)}</td></tr></tfoot>
+      </table>
+      <p style="text-align:center;font-size:9pt;color:#999;margin-top:16px">Thank you for your purchase!</p>
+    </body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.top = "-10000px";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "800px";
+    iframe.style.height = "600px";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 250);
+  };
+
   const handleNewSale = () => {
     setReceiptOpen(false);
     setLastSale(null);
@@ -668,7 +744,7 @@ export default function POSPage() {
             <DialogTitle>Sale Completed — Receipt</DialogTitle>
           </DialogHeader>
           {lastSale && (
-            <div className="space-y-4" ref={receiptContentRef}>
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="text-gray-500">Sale ID:</span>{" "}
@@ -766,28 +842,7 @@ export default function POSPage() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const receiptEl = receiptContentRef.current;
-                    if (!receiptEl) return;
-                    const printWin = window.open(
-                      "",
-                      "_blank",
-                      "width=400,height=600",
-                    );
-                    if (!printWin) {
-                      window.print();
-                      return;
-                    }
-                    printWin.document.write(
-                      "<html><head><title>Receipt</title><style>body{font-family:sans-serif;font-size:12pt;margin:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4pt 6pt;text-align:left}th{background:#f5f5f5}.text-right{text-align:right}.font-bold{font-weight:bold}.border-t{border-top:2px solid #333;margin-top:8px;padding-top:8px}.text-primary{color:#2563eb}.text-gray-500{color:#666}.text-red-600{color:#dc2626}.text-green-600{color:#16a34a}.text-orange-600{color:#ea580c}.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}.col-span-2{grid-column:span 2}.space-y{margin-bottom:6px}.flex-between{display:flex;justify-content:space-between}</style></head><body>",
-                    );
-                    printWin.document.write(receiptEl.innerHTML);
-                    printWin.document.write("</body></html>");
-                    printWin.document.close();
-                    printWin.focus();
-                    setTimeout(() => {
-                      printWin.print();
-                      printWin.close();
-                    }, 300);
+                    if (lastSale) printReceiptContent(lastSale, prefs.currency);
                   }}
                   className="flex-1"
                   data-ocid="pos.secondary_button"
